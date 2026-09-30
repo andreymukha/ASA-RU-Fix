@@ -33,7 +33,7 @@ Custom:    82631f8928a818cebf922b4e4ee834f3e22deb44ab4e26e645cb7cb0bf4bcb78
 Result: MATCH
 ```
 
-Our LOCRES writer gave byte-identical no-op round-trips for **both EN and RU**. Modified RU: V3, 35,407 keys, 4,975,232 bytes. Complete dictionary equals official RU plus one correction.
+Our LOCRES writer gave byte-identical no-op round-trips for **both EN and RU**. Modified RU: V3, 35,407 keys, 4,975,184 bytes. Complete dictionary equals official RU plus one correction.
 
 ## Bootstrap
 
@@ -58,8 +58,8 @@ Static search covers all seven production code files: build.py, tools/steam.py, 
 ## Verified artifact
 
 - Path: `E:\Projects\ARK Survival\ASA-RU-Fix\dist\ASA_RU_Fix_P.pak`
-- Size: **4,975,896 bytes**.
-- SHA-256: `b49eca8222f6d6f4671ae5f9903b09ad0759a1b56c44ebbce4d1365e384dcb0e`.
+- Size: **4,975,848 bytes**.
+- SHA-256: `29e5ce8fff961b924ef8c63dd6f88d1d39ed834921d8648362ac801dd6650ae0`.
 - **V11**, mount **../../../**, no encryption/compression.
 - Exactly one file: `ShooterGame/Content/Localization/ShooterGame/ru/ShooterGame.locres`.
 - repak info/list/unpack passed. Reopened LOCRES equals rebuilt input byte for byte; V3, all 35,407 keys verified.
@@ -68,12 +68,30 @@ Correction confirmed after final PAK extraction:
 
 | Key | Official EN | Official RU | Patch |
 |---|---|---|---|
-| `GraphLiteral<TAB>63761803` | Play | Играть | Играть [RU FIX TEST] |
+| `Content<TAB>1408111756` | back | спина | Назад |
 
-## Separate manual check
+## In-game end-to-end test — PASSED
 
-ARK was not launched. PAK was not installed. No game or DevKit files were modified/deleted.
+On 2026-09-30, the user reported a successful end-to-end test in the real game.
+The temporary marked translation appeared instead of stock `спина` on the mode
+selection screen: cards for Dragontopia, Tides of Fortune, Join Game, Create or
+Resume Game and Mod List; the Back button is at the bottom center. This visually
+confirms the string's location and that the patch PAK overrides stock localization.
 
-When you choose to test visually, install separately and check the early menu Play action. Widget placement, actual game loading and server/anti-cheat compatibility remain unverified. Remove the temporary correction after checking and rebuild.
+Confirmed key: `Content<TAB>1408111756`; EN source: lowercase `back`;
+official RU: `спина`; final corrected RU: **Назад**. The uppercase first letter
+follows [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md).
+
+The successful game test used the temporary marker. Finalization removes that
+marker; the final unmarked artifact was checked through repak info/list/unpack
+and a repeated LOCRES parse. `Content<TAB>1408111756` equals `Назад`, and
+`GraphLiteral<TAB>63761803` equals official `Играть`. No test marker remains in
+corrections, any final LOCRES string, or its UTF-8/UTF-16 bytes. The complete
+parsed dictionary equals official RU plus the one final correction.
+
+During finalization the agent did not launch ARK, install the new PAK, access
+DevKit or change installed game files. The final unmarked PAK has not been
+retested in the running game by the agent. Server/anti-cheat compatibility is
+not established by the reported UI test.
 
 **DevKit can be removed without affecting this verified standalone build.** Future updates in the supported V12/Oodle/LOCRES format are read afresh. Format changes deliberately produce an explicit error, requiring a reader update.

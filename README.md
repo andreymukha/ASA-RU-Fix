@@ -31,7 +31,7 @@ Artifacts, pinned source and licenses stay in ignored `work/tools/`. repak's off
 
 Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text. Every key must exist in current official RU LOCRES. Only corrections are stored in Git; the complete merged resource is generated in ignored `work/`.
 
-The current correction is a temporary `[RU FIX TEST]` marker documented in [TESTING.md](TESTING.md). `data/additions.json` stays empty and experimental; non-empty additions are rejected. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
+Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stays empty and experimental; non-empty additions are rejected. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
 ## Optional validation
 
@@ -44,7 +44,7 @@ The second command runs the complete production build with filesystem, DLL, impo
 
 ## Install / uninstall later
 
-When you choose to install, preview with `./install.ps1 -WhatIf`, then run `./install.ps1`. It copies/replaces only `ASA_RU_Fix_P.pak`. Preview removal with `./uninstall.ps1 -WhatIf`; `./uninstall.ps1` removes only that patch. Game launch is separate. Visible menu placement and server/anti-cheat compatibility require a manual check.
+When you choose to install, preview with `./install.ps1 -WhatIf`, then run `./install.ps1`. It copies/replaces only `ASA_RU_Fix_P.pak`. Preview removal with `./uninstall.ps1 -WhatIf`; `./uninstall.ps1` removes only that patch. Game launch is separate. Future corrections need manual context checks; server/anti-cheat compatibility is not established by the verified Back button fix.
 
 ## Third-party components
 
