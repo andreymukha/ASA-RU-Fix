@@ -1,15 +1,15 @@
-# Russian localization v1 candidate — 2026-10-01
+# FINAL V1 CANDIDATE — 2026-10-01
 
-This is a candidate for manual testing, not a final release. The user confirmed the preceding stable 1019 corrections work in game. New additions and Engine output require fresh game verification. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
+Status: **FINAL V1 CANDIDATE**. Only the user’s manual smoke-test remains before final v1. The user confirmed the preceding stable 1019 corrections work in game. New additions and Engine output require fresh game verification. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
 
 ## Current prepared artifact
 
-- Corrections: **1162** (1019 stable + 143 new screenshot keys).
+- Corrections: **1167** (1162 previous candidate + 5 new final cleanup keys).
 - ShooterGame additions: **43** (41 from the preserved deferred review + 2 confirmed batch 27 EN-only keys).
 - Engine edits: **21** InputKeys entries, including 20 existing RU keys and 1 EN-only insertion (`InputKeys<TAB>Insert`).
 - Targeted orphan widget entries created: **0**.
-- PAK: `dist/ASA_RU_Fix_P.pak`, **10,773,598 bytes**.
-- SHA-256: `4f427f0ee2dbe01bae43f30689bf6f17087a10b0e441478dc289c99813bf265f`.
+- PAK: `dist/ASA_RU_Fix_P.pak`, **10,773,564 bytes**.
+- SHA-256: `9682d73ee053732c6cb778523b1258fd226feb2ed2ec41a7ef032c65267fbd69`.
 - V11, mount `../../../`, exactly these files:
 
 ```text
@@ -19,7 +19,7 @@ ShooterGame/Content/Localization/ShooterGame/ru/ShooterGame.locres
 
 The user authorized both additional batch 27 EN-only keys on 2026-10-01. They are included in additions: `GraphLiteral<TAB>1863176983` (`, WIND:` -> `, ВЕТЕР:`) and `GraphLiteral<TAB>3285020872` (`MOD ARKS` -> `КАРТЫ ИЗ МОДОВ`). The latter translation follows the user's latest revision, overriding the archived CSV's `МОДОВЫЕ КАРТЫ`. All 43 additions remain separate from corrections; no review archive was rewritten.
 
-## Screenshot import
+## Historical screenshot import — batches 26–28
 
 Applied explicit priority 28 > 27 > 26 > stable data. Count before each step:
 
@@ -31,13 +31,26 @@ Applied explicit priority 28 > 27 > 26 > stable data. Count before each step:
 
 Batch 27 JSON was absent. Its 61 exact `FIX`/`proposed_ru` CSV rows were recovered without semantic changes into `work/review/review_batch_27_corrections_candidate_recovered.json`. Source review files were preserved. Per-key revisions and preflight results are in `work/review/screenshot_import_validation.json`. Ordinary generic candidate import continues to reject different existing values; these revisions were explicitly authorized for this batch sequence.
 
+## Final cleanup — batches 29–30
+
+Only these two new candidate JSON files were imported; older review files were not merged again. Authorized priority: batch 30 > batch 29 > previous authoritative corrections.
+
+| Batch | NEW | REVISION | EXACT_DUPLICATE | CONFLICT |
+|---|---:|---:|---:|---:|
+| 29 | 4 | 0 | 1 | 0 |
+| 30 | 1 | 2 | 0 | 0 |
+
+Corrections: **1162 -> 1167**. SHOW BUFFS is an exact duplicate and adds no key. Both Hide Hat identities now equal **Кожаная шапка**: the screenshot confirms an item of clothing, with `hide` meaning leather. Companion Speed Booster equals **Усилитель скорости компаньона**. The additions and Engine data files remain byte-identical to the previous candidate (43 and 21 edits respectively).
+
+All **10** root review CSV/JSON artifacts were moved without overwrite to ignored `work/review/archive-2026-09-30/`. Each SHA-256 was verified before and after the move; `manifest.json` records filename, hash, size and purpose. No root review CSV/JSON remains; no review artifact is committed. Reports: `work/review/final_cleanup_preflight.json` and `work/review/final_v1_verification.json`.
+
 ## Missing RU mechanism and validation
 
 RU remains the base. Only requested missing keys are copied from current EN, including namespace/key FStrings and namespace/key/source hashes. Existing RU entry metadata and translations remain intact except requested corrections. Insertion follows actual EN sequence, with no arbitrary append; incompatible RU/EN order is rejected. Serialization rebuilds unique strings and refcounts. Both current stock RU resources are EN subsequences.
 
 Fresh production build and standalone guarded build passed. After repak info/list/unpack and repeated LOCRES parse:
 
-- **1162/1162 corrections**, **43/43 ShooterGame additions**, **21/21 Engine edits**: MATCH, zero mismatches.
+- **1167/1167 corrections**, **43/43 ShooterGame additions**, **21/21 Engine edits**: MATCH, zero mismatches.
 - ShooterGame: 35,407 stock RU + 43 additions = **35,450 keys**.
 - Engine: 45,771 stock RU + Insert = **45,772 keys**.
 - Full dictionaries equal stock RU plus explicit edits; every stock identity hash remains unchanged.
@@ -47,7 +60,7 @@ Fresh production build and standalone guarded build passed. After repak info/lis
 - No `RU FIX TEST` in edit values or either LOCRES string table.
 - **62 unit tests PASS**; standalone guard: **0 forbidden accesses**, four cached repak calls.
 
-Reports/logs: `work/build_validation.json`, `work/review/candidate_full_verification.json`, `work/review/candidate_build.log`, `work/review/candidate_unit_tests.log`, `work/review/candidate_standalone_build.log`, `work/review/source_hash_investigation.json`.
+Reports/logs: `work/build_validation.json`, `work/review/final_v1_verification.json`, `work/review/final_v1_build.log`, `work/review/final_v1_unit_tests.log`, `work/review/final_v1_standalone_build.log`. The earlier `work/review/source_hash_investigation.json` remains the documented widget research evidence; no further widget repair was attempted in final cleanup.
 
 ## Adobe additions smoke test
 
@@ -97,12 +110,14 @@ The asset source CRC32 equals current EN and RU hashes for every found Content F
 
 The independent ooz research adapter and compile intermediates were removed after extraction. retoc remains only in ignored `work/tools/` and is not required by production.
 
-## Manual test plan
+## Manual smoke-test plan
 
-1. Confirm ordinary corrections remain active, especially `Назад` and both crosshair color labels. If they disappear after enabling additions, **FAIL**: the rebuilt resource may have been rejected; retain evidence and return to the stable PAK.
-2. Check Adobe Gateway / Adobe Gate, then the three other Adobe examples above.
-3. Check physical key labels: Пробел, Левый/Правый Ctrl and Shift, wheel directions, Num 0 / Num / / Num *, Тильда, Insert and brackets.
-4. Check the exact visible `WEIGHT` and `Crafting Requirements` instances. Expected `ВЕС` and `Для создания требуется:`. A remaining EN instance is an unresolved limitation, not a passing result.
-5. Check Carcha Saddle, Tek Crop Plot and Charged: `Седло для Кархародонтозавра`, `Тек-грядка`, `Заряженный`; also Yi Ling Saddle, Hide Hat and Tek Gateway.
+1. Settings: Sound / Graphics / UI / Camera.
+2. Physical key names from Engine.locres.
+3. EN-only additions: Adobe Gateway / Adobe Gate / Adobe Behemoth Gateway.
+4. Carcharo Saddle: **Седло для Кархародонтозавра**.
+5. Hide Hat: **Кожаная шапка**.
+6. Companion Speed Booster: **Усилитель скорости компаньона**.
+7. The original **Назад** correction remains active.
 
-Record all five manual results. The remaining English widget instances are a documented v1 limitation under the user’s 2026-10-01 instructions; they are not claimed fixed. The user decides whether to release this candidate with that limitation.
+If ordinary corrections disappear after additions, record FAIL: the rebuilt LOCRES may have been rejected. WEIGHT / Crafting Requirements are accepted, documented v1 limitations and do not count as a v1 smoke-test failure. Third-party CS / Cybers Structures and other mod text are outside this project’s scope. The user runs the smoke-test and decides whether to release final v1.

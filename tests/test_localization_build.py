@@ -118,10 +118,17 @@ class LocalizationBuildTests(unittest.TestCase):
                     'Content\t3789992885': 'Седло для И Линга',
                     'Content\t2281052626': 'Заряженный',
                     'GraphLiteral\t2281052626': 'Заряженный',
-                    'Content\t3027221575': 'Скрыть головной убор',
-                    'Globals\t3027221575': 'Скрыть головной убор',
+                    'Content\t3027221575': 'Кожаная шапка',
+                    'Globals\t3027221575': 'Кожаная шапка',
                     'Content\t3927745900': 'Тек-рама для ворот'}
         expected['GraphLiteral\t3707105056'] = 'ВЕС'
+        expected.update({'Content\t2879543335': 'Седло для Кархародонтозавра',
+                         'Content\t2232173803': 'Седло для Берроубака',
+                         'Content\t2318685006': 'Парниковая крыша: треугольник и угол',
+                         'Content\t2672943785': 'Стол для доработки',
+                         'Content\t4053904995': 'Усилитель скорости компаньона',
+                         'GraphLiteral\t397870435': 'Показать эффекты'})
+        self.assertEqual(len(edits), 1167)
         self.assertEqual({key: edits[key] for key in expected}, expected)
         self.assertNotIn('GraphLiteral\t63761803', edits)
         self.assertFalse(any('RU FIX TEST' in value for value in edits.values()))

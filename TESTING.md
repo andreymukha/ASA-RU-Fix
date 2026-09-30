@@ -1,6 +1,6 @@
 # Standalone verification — 2026-09-30
 
-## Current v1 candidate
+## FINAL V1 CANDIDATE
 
 See [V1_CANDIDATE.md](V1_CANDIDATE.md) for the current artifact, counts, targeted widget evidence and manual test plan. The stable 1019-correction version was reported by the user as working in the real game. The new additions/Engine candidate requires a new manual game test; the agent does not launch ARK or install the patch.
 
@@ -12,7 +12,9 @@ python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-**2026-10-01 candidate:** 1162/1162 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **62 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+**2026-10-01 candidate:** 1167/1167 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **62 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+
+Final cleanup batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Corrections increase 1162 -> 1167; additions/Engine JSON bytes remain unchanged. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. All ten root review files were archived with SHA-256 verification; no root review CSV/JSON remains. Current artifact and compact smoke-test are recorded in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
 
 Tests cover requested EN-only insertion in native position, EN namespace/key/source hash copying, namespace positioning, incompatible order rejection, corrections coexisting with additions, Engine existing/missing keys, both PAK entries, unexpected PAK files, every post-unpack edit and the screenshot regressions. Widget orphan creation is not implemented because no orphan identity was confirmed. All current placeholder/RichText preflights and reopened resource verification must pass. Historical results below refer to their earlier artifacts.
 
