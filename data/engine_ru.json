@@ -1,0 +1,23 @@
+{
+  "InputKeys\tAdd": "Num +",
+  "InputKeys\tBackslash": "Обратная косая черта",
+  "InputKeys\tDivide": "Num /",
+  "InputKeys\tInsert": "Insert",
+  "InputKeys\tLeftAlt": "Левый Alt",
+  "InputKeys\tLeftBracket": "Левая квадратная скобка",
+  "InputKeys\tLeftControl": "Левый Ctrl",
+  "InputKeys\tLeftMouseButton": "Левая кнопка мыши",
+  "InputKeys\tLeftShift": "Левый Shift",
+  "InputKeys\tMiddleMouseButton": "Средняя кнопка мыши",
+  "InputKeys\tMouseScrollDown": "Колесо мыши вниз",
+  "InputKeys\tMouseScrollUp": "Колесо мыши вверх",
+  "InputKeys\tMultiply": "Num *",
+  "InputKeys\tNumPadZero": "Num 0",
+  "InputKeys\tRightAlt": "Правый Alt",
+  "InputKeys\tRightBracket": "Правая квадратная скобка",
+  "InputKeys\tRightControl": "Правый Ctrl",
+  "InputKeys\tRightMouseButton": "Правая кнопка мыши",
+  "InputKeys\tRightShift": "Правый Shift",
+  "InputKeys\tSpaceBar": "Пробел",
+  "InputKeys\tSubtract": "Num -"
+}

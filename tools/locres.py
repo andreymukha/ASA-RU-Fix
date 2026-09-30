@@ -6,7 +6,7 @@ import argparse
 import json
 import struct
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 MAGIC = bytes.fromhex("0e147475674a03fc4a15909dc3377f1b")
@@ -94,6 +94,7 @@ def parse(data: bytes) -> Resource:
         raise LocresError("missing namespace count")
     namespace_count = struct.unpack_from("<I", data, HEADER.size)[0]
     entries: list[Entry] = []
+    namespace_data = data[:string_offset]
     pos = HEADER.size
     pos += 4
     for _ in range(namespace_count):
@@ -101,7 +102,7 @@ def parse(data: bytes) -> Resource:
             raise LocresError(f"namespace table ended after {len(entries)} of {total_keys} keys")
         namespace_hash = struct.unpack_from("<I", data, pos)[0]
         pos += 4
-        namespace, pos = read_fstring(data[:string_offset], pos)
+        namespace, pos = read_fstring(namespace_data, pos)
         if pos + 4 > string_offset:
             raise LocresError("truncated namespace key count")
         count = struct.unpack_from("<I", data, pos)[0]
@@ -113,7 +114,7 @@ def parse(data: bytes) -> Resource:
                 raise LocresError("truncated key hash")
             key_hash = struct.unpack_from("<I", data, pos)[0]
             pos += 4
-            key, pos = read_fstring(data[:string_offset], pos)
+            key, pos = read_fstring(namespace_data, pos)
             if pos + 8 > string_offset:
                 raise LocresError("truncated source hash/string index")
             source_hash, value_index = struct.unpack_from("<Ii", data, pos)
@@ -156,6 +157,41 @@ def parse(data: bytes) -> Resource:
     if actual_refs != refs:
         raise LocresError("localized string reference counts do not match namespace entries")
     return Resource(version, entries, strings, refs)
+
+
+def insert_missing(ru: Resource, en: Resource, additions: dict[str, str]) -> Resource:
+    """Insert explicitly requested EN entries into RU in native EN order.
+
+    Fail if the stock RU sequence is not an EN subsequence. This avoids
+    inventing a position or reordering the existing RU resource.
+    """
+    if not additions:
+        return ru
+    identity = lambda e: f"{e.namespace.value}\t{e.key.value}"
+    ru_entries = {identity(e): e for e in ru.entries}
+    en_entries = {identity(e): e for e in en.entries}
+    if set(additions) & set(ru_entries) or set(additions) - set(en_entries):
+        raise LocresError('additions require EN exists + RU missing')
+    if ru.version != en.version:
+        raise LocresError('EN/RU LOCRES versions differ')
+    if [identity(e) for e in en.entries if identity(e) in ru_entries] != list(ru_entries):
+        raise LocresError('stock RU order is not a native EN subsequence')
+    strings = list(ru.strings)
+    entries = []
+    for source in en.entries:
+        key = identity(source)
+        if key in ru_entries:
+            entries.append(ru_entries[key])
+        elif key in additions:
+            if not isinstance(additions[key], str) or not additions[key].strip():
+                raise LocresError('addition must be nonempty text')
+            entries.append(replace(source, namespace=replace(source.namespace),
+                                   key=replace(source.key), value_index=len(strings)))
+            strings.append(FString(additions[key], any(ord(c) > 127 for c in additions[key])))
+    refs = [0] * len(strings)
+    for entry in entries:
+        refs[entry.value_index] += 1
+    return Resource(ru.version, entries, strings, refs)
 
 
 def serialize(resource: Resource, edits: dict[str, str]) -> bytes:

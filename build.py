@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tools.locres import LocresError, load_edits, parse, serialize
+from tools.locres import LocresError, load_edits, parse, serialize, insert_missing
 from tools.corrections import validate_corrections, verify_applied
 from tools.steam import find_game
 from tools.pakv12 import PakReader
@@ -19,7 +19,7 @@ from tools.pakv12 import PakReader
 ROOT = Path(__file__).resolve().parent
 PAK_REL = Path("ShooterGame/Content/Paks/pakchunk0-Windows.pak")
 INTERNAL = "ShooterGame/Content/Localization/ShooterGame/ru/ShooterGame.locres"
-GAME_LANG_DIR = "ShooterGame/Content/Localization/ShooterGame"
+ENGINE_INTERNAL = "Engine/Content/Localization/Engine/ru/Engine.locres"
 
 
 def resolve_game(explicit: Path | None, parser: argparse.ArgumentParser) -> Path:
@@ -65,6 +65,52 @@ def run_repak(exe: Path, *args: str) -> str:
     return output
 
 
+def build_resource(en, ru, corrections, additions):
+    correction_validation = validate_corrections(corrections, en.as_dict(), ru.as_dict())
+    base = insert_missing(ru, en, additions)
+    addition_validation = validate_corrections(additions, en.as_dict(), base.as_dict())
+    rebuilt = serialize(base, corrections)
+    actual = parse(rebuilt)
+    if actual.as_dict() != {**ru.as_dict(), **additions, **corrections}:
+        raise LocresError('rebuilt LOCRES failed full dictionary verification')
+    # Serialization must retain copied EN identity hashes and native position.
+    expected_order = [(e.namespace_hash, e.namespace, e.key_hash, e.key, e.source_hash) for e in base.entries]
+    actual_order = [(e.namespace_hash, e.namespace, e.key_hash, e.key, e.source_hash) for e in actual.entries]
+    if expected_order != actual_order:
+        raise LocresError('rebuilt LOCRES identity hashes/order changed')
+    return rebuilt, {'corrections_preflight': correction_validation, 'additions_preflight': addition_validation,
+                     'corrections_verification': verify_applied(corrections, actual.as_dict()),
+                     'additions_verification': verify_applied(additions, actual.as_dict()),
+                     'stock_en_keys': len(en.entries), 'stock_ru_keys': len(ru.entries),
+                     'rebuilt_keys': len(actual.entries), 'native_order_and_hashes': 'PASS'}
+
+
+def verify_package(repak, dist, verify_root, resources, edits):
+    listing = run_repak(repak, 'list', str(dist))
+    entries = [line.strip().replace('\\', '/') for line in listing.splitlines() if line.strip()]
+    if sorted(entries) != sorted(resources):
+        raise RuntimeError(f'patch PAK contains unexpected entries: {entries!r}')
+    info = run_repak(repak, 'info', str(dist))
+    if 'mount point: ../../../' not in info or 'version: V11' not in info:
+        raise RuntimeError(f'patch PAK has unexpected mount point/version:\n{info}')
+    verify_root.mkdir(parents=True, exist_ok=True)
+    for name in resources:
+        (verify_root / name).unlink(missing_ok=True)
+    run_repak(repak, 'unpack', '--quiet', '--force', '--output', str(verify_root), str(dist))
+    results = {}
+    for name, built in resources.items():
+        path = verify_root / name
+        actual = path.read_bytes()
+        if actual != built:
+            raise RuntimeError(f'PAK-extracted LOCRES bytes differ: {name}')
+        parsed = parse(actual).as_dict()
+        if parsed != parse(built).as_dict():
+            raise LocresError(f'PAK-extracted LOCRES dictionary differs: {name}')
+        results[name] = verify_applied(edits[name], parsed)
+    return {'files': sorted(entries), 'edits': results, 'repak_info': info,
+            'list_info_unpack': 'PASS'}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--game-path", type=Path, help="Explicit ASA installation directory")
@@ -79,88 +125,68 @@ def main() -> int:
 
     work = ROOT / "work"
     extract_root = work / "source"
-    en_rel = Path(GAME_LANG_DIR) / "en" / "ShooterGame.locres"
-    ru_rel = Path(GAME_LANG_DIR) / "ru" / "ShooterGame.locres"
-    en_path, ru_path = extract_root / en_rel, extract_root / ru_rel
-    for path in (en_path, ru_path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.unlink(missing_ok=True)
     print(f"Game: {game}\nSource PAK V12: {source_pak}\nExtractor: tools.pakv12 + cached ooz DLL\nrepak writer: {repak}")
-    for language in ("en", "ru"):
-        expected = f"ShooterGame/Content/Localization/ShooterGame/{language}/ShooterGame.locres"
-        (extract_root / Path(expected)).write_bytes(reader.extract('../../../' + expected))
+    resources, all_edits, reports = {}, {}, {}
+    for name, internal, correction_file, addition_file in (
+        ('ShooterGame', INTERNAL, 'corrections.json', 'additions.json'),
+        ('Engine', ENGINE_INTERNAL, 'engine_ru.json', None),
+    ):
+        stock = {}
+        stock_hashes = {}
+        for language in ('en', 'ru'):
+            relative = internal.replace('/ru/', f'/{language}/')
+            raw = reader.extract('../../../' + relative)
+            path = extract_root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            stock[language] = parse(raw)
+            stock_hashes[language] = hashlib.sha256(raw).hexdigest()
+            dump_name = language if name == 'ShooterGame' else 'engine_' + language
+            (work / (dump_name + '.json')).write_text(
+                json.dumps(stock[language].as_dict(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        edits = load_edits(ROOT / 'data' / correction_file)
+        if name == 'Engine':
+            if any(not key.startswith('InputKeys\t') for key in edits):
+                raise LocresError('Engine edits must belong to InputKeys')
+            additions = {key: value for key, value in edits.items() if key not in stock['ru'].as_dict()}
+            corrections = {key: value for key, value in edits.items() if key not in additions}
+        else:
+            corrections = edits
+            additions = load_edits(ROOT / 'data' / addition_file)
+        built, report = build_resource(stock['en'], stock['ru'], corrections, additions)
+        report['stock_sha256'] = stock_hashes
+        resources[internal] = built
+        all_edits[internal] = {**corrections, **additions}
+        reports[name] = report
+        path = work / 'rebuilt' / internal
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(built)
+        dump_name = 'ru_rebuilt' if name == 'ShooterGame' else 'engine_ru_rebuilt'
+        (work / (dump_name + '.json')).write_text(
+            json.dumps(parse(built).as_dict(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        print(f"{name}: {len(corrections)} corrections; {len(additions)} additions; {report['rebuilt_keys']} keys")
 
-    en, ru = parse(en_path.read_bytes()), parse(ru_path.read_bytes())
-    en_dump, ru_dump = en.as_dict(), ru.as_dict()
-    (work / "en.json").write_text(json.dumps(en_dump, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (work / "ru.json").write_text(json.dumps(ru_dump, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"English: LOCRES v{en.version}, {len(en.entries):,} keys, {en_path.stat().st_size:,} bytes")
-    print(f"Russian: LOCRES v{ru.version}, {len(ru.entries):,} keys, {ru_path.stat().st_size:,} bytes")
-
-    additions_path = ROOT / "data" / "additions.json"
-    additions = load_edits(additions_path)
-    if additions:
-        raise RuntimeError("additions.json is experimental and non-empty additions are not supported; clear it before building")
-    corrections = load_edits(ROOT / "data" / "corrections.json")
-    correction_validation = validate_corrections(corrections, en_dump, ru_dump)
-    rebuilt = serialize(ru, corrections)
-    rebuilt_resource = parse(rebuilt)
-    merged = {**ru_dump, **corrections}
-    if rebuilt_resource.as_dict() != merged:
-        raise LocresError("rebuilt LOCRES failed full dictionary verification")
-
-    built_locres = work / "rebuilt" / Path(INTERNAL)
-    built_locres.parent.mkdir(parents=True, exist_ok=True)
-    built_locres.write_bytes(rebuilt)
-    patched_dump = work / "ru_rebuilt.json"
-    patched_dump.write_text(json.dumps(rebuilt_resource.as_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Corrections applied: {len(corrections)}; rebuilt LOCRES: {len(rebuilt):,} bytes")
-
-    stage_root = work / "pak_stage"
-    staged = stage_root / Path(INTERNAL)
-    staged.parent.mkdir(parents=True, exist_ok=True)
-    staged.write_bytes(rebuilt)
-    dist = ROOT / "dist" / "ASA_RU_Fix_P.pak"
+    stage_root = work / 'pak_stage'
+    # Refuse stale extra files rather than silently package an old resource.
+    stale = {p.relative_to(stage_root).as_posix() for p in stage_root.rglob('*') if p.is_file()} - set(resources)
+    if stale:
+        raise RuntimeError(f'Unexpected stale PAK staging files: {sorted(stale)}')
+    for internal, built in resources.items():
+        staged = stage_root / internal
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        staged.write_bytes(built)
+    dist = ROOT / 'dist' / 'ASA_RU_Fix_P.pak'
     dist.parent.mkdir(parents=True, exist_ok=True)
     dist.unlink(missing_ok=True)
-    run_repak(repak, "pack", "--version", "V11", "--mount-point", "../../../", "--quiet", str(stage_root), str(dist))
-    listing = run_repak(repak, "list", str(dist))
-    entries = [line.strip().replace("\\", "/") for line in listing.splitlines() if line.strip()]
-    if entries != [INTERNAL]:
-        raise RuntimeError(f"patch PAK contains unexpected entries: {entries!r}")
-    info = run_repak(repak, "info", str(dist))
-    if "mount point: ../../../" not in info or "version: V11" not in info:
-        raise RuntimeError(f"patch PAK has unexpected mount point/version:\n{info}")
-    print(f"PAK mount point: ../../../; entry: {entries[0]}; version: V11")
-
-    verify_root = work / "pak_verify"
-    verify_root.mkdir(parents=True, exist_ok=True)
-    extracted = verify_root / Path(INTERNAL)
-    extracted.unlink(missing_ok=True)
-    run_repak(repak, "unpack", "--quiet", "--force", "--output", str(verify_root), "--include", INTERNAL, str(dist))
-    if not extracted.is_file():
-        raise RuntimeError("patch PAK could not be extracted back to ShooterGame.locres")
-    extracted_resource = parse(extracted.read_bytes())
-    extracted_dump = extracted_resource.as_dict()
-    applied = verify_applied(corrections, extracted_dump)
-    if extracted_dump != merged:
-        raise LocresError("PAK-extracted LOCRES failed full dictionary verification")
-    if extracted.read_bytes() != rebuilt:
-        raise RuntimeError("LOCRES bytes extracted from patch PAK differ from the rebuilt input")
-    validation_report = {
-        "corrections_preflight": correction_validation,
-        "corrections_verification": applied,
-        "stock_en_keys": len(en_dump), "stock_ru_keys": len(ru_dump),
-        "stock_en_locres_sha256": hashlib.sha256(en_path.read_bytes()).hexdigest(),
-        "stock_ru_locres_sha256": hashlib.sha256(ru_path.read_bytes()).hexdigest(),
-        "pak_path": str(dist), "pak_size": dist.stat().st_size,
-        "pak_sha256": hashlib.sha256(dist.read_bytes()).hexdigest(),
-    }
-    (work / "build_validation.json").write_text(
-        json.dumps(validation_report, indent=2) + "\n", encoding="utf-8")
-    print(f"Post-build corrections: {applied['actual']}/{applied['expected']} MATCH; mismatches: {applied['mismatches']}")
-    detail = "; ".join(part.strip() for part in info.splitlines() if part.strip())
-    print(f"Verified patch: {dist} ({dist.stat().st_size:,} bytes); {detail}; reopened and extracted LOCRES v{extracted_resource.version}, {len(extracted_resource.entries):,} keys")
+    run_repak(repak, 'pack', '--version', 'V11', '--mount-point', '../../../', '--quiet', str(stage_root), str(dist))
+    package = verify_package(repak, dist, work / 'pak_verify', resources, all_edits)
+    validation_report = {'resources': reports, 'package': package,
+                         'pak_path': str(dist), 'pak_size': dist.stat().st_size,
+                         'pak_sha256': hashlib.sha256(dist.read_bytes()).hexdigest()}
+    (work / 'build_validation.json').write_text(json.dumps(validation_report, indent=2) + '\n', encoding='utf-8')
+    for internal, result in package['edits'].items():
+        print(f"{internal}: {result['actual']}/{result['expected']} MATCH; mismatches: {result['mismatches']}")
+    print(f"Verified candidate: {dist} ({dist.stat().st_size:,} bytes); SHA-256 {validation_report['pak_sha256']}")
     return 0
 
 

@@ -17,7 +17,7 @@ python build.py
 python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
 ```
 
-Review `dist/ASA_RU_Fix_P.pak`. Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
+Review the **v1 candidate** `dist/ASA_RU_Fix_P.pak` and [manual test plan](V1_CANDIDATE.md). Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
 
 Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. After unpacking the PAK, every correction must match its expected value; counts and artifact SHA-256 are recorded in ignored `work/build_validation.json`.
 
@@ -29,11 +29,15 @@ Artifacts, pinned source and licenses stay in ignored `work/tools/`. repak's off
 
 ## Corrections
 
-Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text. Every key must exist in current official RU LOCRES. Only corrections are stored in Git; the complete merged resource is generated in ignored `work/`.
+Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text. Every key must exist in current official RU LOCRES. Only explicit translations are stored in Git; the complete rebuilt resources are generated in ignored `work/`.
 
-Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stays empty and experimental; non-empty additions are rejected. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
+Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stores explicitly reviewed EN-only ShooterGame keys. Build copies their EN namespace/key/source hashes and inserts them in native EN order into the stock RU base, then rebuilds string tables/refcounts. Keys already present in RU, unknown EN keys or incompatible stock order fail explicitly. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
-The first large batch from an **external semantic review** is integrated: **1019 total corrections** (1018 new plus the verified Back fix). Of 1059 original candidates, 41 EN-only keys are deferred in ignored `work/review/deferred_missing_ru.json`; adding new RU keys is outside the current correction pipeline. Three RichColor replacements were supplied by the user before import. Raw review archives and the prepared `importable_1018.json` remain in ignored `work/review/`.
+The current **v1 candidate** extends the user-confirmed stable 1019-correction batch with screenshot batches 26–28. Later batches override earlier reviewed values explicitly; ordinary candidate import still rejects unexplained conflicts. Batch 27 JSON was absent, so its exact 61 `FIX` values were recovered from the supplied CSV into ignored `work/review/`. Two of those keys are EN-only and included in the **43 additions**, separate from **1162 corrections**; `MOD ARKS` follows the user’s final `КАРТЫ ИЗ МОДОВ` revision. See [V1_CANDIDATE.md](V1_CANDIDATE.md) for counts and limitations.
+
+`data/engine_ru.json` contains only confirmed `InputKeys` identities. Engine EN/RU resources are freshly extracted from the same installed V12 PAK. Existing RU keys are corrected; an explicitly requested EN-only key is inserted by the same safe merge. Production packs both Engine RU and ShooterGame RU LOCRES, then reopens both and verifies every translation and byte. `Tilde` has no confirmed InputKeys entry in the current resources and is not guessed.
+
+Targeted widget research found collected FText for `WEIGHT` and `Crafting Requirements`, but no proven orphan identity explaining the reported English UI instances. Fresh source-hash checks also confirmed matching EN/RU/asset hashes for both strings, so no source-hash synchronization is needed. No orphan entries are generated. Research tools/assets remain in ignored `work/` and are not production dependencies.
 
 For future reviewed candidates, first run the production build to refresh the stock dumps, then run `python -m tools.corrections --candidate PATH_TO_CUMULATIVE.json` for a dry-run preflight. `--expected-new` and `--expected-total` can enforce batch counts; `--apply` writes a sorted UTF-8 corrections file only after validation succeeds. Conflicting existing values, duplicate JSON keys, missing official keys, empty replacements, changed placeholders and damaged RichText fail explicitly. Rebuild with `python build.py` after importing.
 

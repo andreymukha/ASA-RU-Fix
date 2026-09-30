@@ -28,3 +28,10 @@
 - Earlier reference: https://github.com/LeXa4894/ASA_fix_ru_loc; no source/binary copied.
 
 Reference clones are ignored `work/reference/` artifacts. DevKit UnrealPak is only an explicit optional oracle executable in `tests/compare_devkit.py`, neither downloaded nor used by production.
+
+## Targeted v1 widget research
+
+- [trumank/retoc v0.1.5](https://github.com/trumank/retoc/releases/tag/v0.1.5), MIT. Official Windows ZIP and published `.sha256` were compared before extraction; release LICENSE is retained in ignored `work/tools/retoc/`.
+- Only the stock `pakchunk0-Windows.utoc` manifest and 19 selected base UI packages were read. No mod directory or global asset localization pass was used.
+- retoc's default loader attempted proprietary Oodle download. Research instead used a temporary local adapter to our existing GPL ooz decoder, with padded buffers and strict output-length checks; no proprietary Oodle library was downloaded. The adapter and its intermediate files were removed after research. retoc is not imported or called by production build/bootstrap.
+- At TradFR commit `8527fc5f89246fec9f67fefcb849c82db1533f7c`, `tools/textes_assets.py`, `tools/balayer_assets.py` and `tools/cityhash.py` were read as technical references, not executed or copied into the project. Exact Base FText triples were independently checked against current stock EN/RU. Source hash comparison uses CRC32 of source UTF-32LE bytes. No orphan key hashes were created because every observed target triple is already collected.

@@ -1,6 +1,22 @@
 # Standalone verification — 2026-09-30
 
-## First large external review batch — verified
+## Current v1 candidate
+
+See [V1_CANDIDATE.md](V1_CANDIDATE.md) for the current artifact, counts, targeted widget evidence and manual test plan. The stable 1019-correction version was reported by the user as working in the real game. The new additions/Engine candidate requires a new manual game test; the agent does not launch ARK or install the patch.
+
+Production commands:
+
+```powershell
+python build.py
+python -m unittest discover -s tests -v
+python tests/standalone_build.py
+```
+
+**2026-10-01 candidate:** 1162/1162 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **62 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+
+Tests cover requested EN-only insertion in native position, EN namespace/key/source hash copying, namespace positioning, incompatible order rejection, corrections coexisting with additions, Engine existing/missing keys, both PAK entries, unexpected PAK files, every post-unpack edit and the screenshot regressions. Widget orphan creation is not implemented because no orphan identity was confirmed. All current placeholder/RichText preflights and reopened resource verification must pass. Historical results below refer to their earlier artifacts.
+
+## Historical stable batch — 1019 corrections
 
 Input: `review_cumulative_1059_corrections_candidate.json`, 1059 external semantic-review candidates; original SHA-256 `a95aa3060c4967aed9a9de04918a0b43d7ed4e0d6ef7c6a10fcc264a8a271b76`. Fresh production extraction confirmed 39,201 EN and 35,407 RU keys. The initial preflight rejected 41 keys absent from stock RU and three damaged RichColor replacements. Following the user's instructions, the 41 keys were preserved in ignored `work/review/deferred_missing_ru.json`; the three exact user-provided replacements were applied only in `work/review/importable_1018.json`. Original review files were archived unchanged in `work/review/`.
 
@@ -8,7 +24,7 @@ Final merge: **1018 new + 1 existing = 1019 corrections**, zero conflicts and ze
 
 `python build.py` passed with cached standalone tools. repak pack/info/list/unpack verified V11, mount `../../../`, and exactly the RU LOCRES entry. The reopened PAK-extracted LOCRES contains all **1019 / 1019 matching corrections; zero mismatches**, and its complete dictionary equals stock RU plus corrections. The extracted bytes equal the rebuilt input. Report: ignored `work/build_validation.json`.
 
-- Current PAK: `dist/ASA_RU_Fix_P.pak`
+- Historical stable PAK: `dist/ASA_RU_Fix_P.pak`
 - Size: **4,964,623 bytes**
 - SHA-256: `5486fad804ee4215aea29cc57e7719562646b59d39812d6d8cf069968812c28d`
 
