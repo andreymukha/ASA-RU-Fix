@@ -6,37 +6,18 @@ import argparse
 import json
 import os
 import shutil
-import struct
 import subprocess
 import sys
 from pathlib import Path
 
 from tools.locres import LocresError, load_edits, parse, serialize
-from tools.steam import find_game, find_unrealpak
+from tools.steam import find_game
+from tools.pakv12 import PakReader
 
 ROOT = Path(__file__).resolve().parent
 PAK_REL = Path("ShooterGame/Content/Paks/pakchunk0-Windows.pak")
 INTERNAL = "ShooterGame/Content/Localization/ShooterGame/ru/ShooterGame.locres"
 GAME_LANG_DIR = "ShooterGame/Content/Localization/ShooterGame"
-MAGIC = struct.pack("<I", 0x5A6F12E1)
-
-
-def pak_version(path: Path) -> int | None:
-    with path.open("rb") as file:
-        file.seek(-512, 2)
-        tail = file.read()
-    index = tail.rfind(MAGIC)
-    if index < 0 or index + 8 > len(tail):
-        return None
-    return struct.unpack_from("<I", tail, index + 4)[0]
-
-
-def run_unrealpak(exe: Path, *args: str) -> str:
-    result = subprocess.run([str(exe), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
-    output = result.stdout + result.stderr
-    if result.returncode:
-        raise RuntimeError(f"UnrealPak failed ({result.returncode}): {' '.join(args)}\n{output[-4000:]}")
-    return output
 
 
 def resolve_game(explicit: Path | None, parser: argparse.ArgumentParser) -> Path:
@@ -53,28 +34,6 @@ def resolve_game(explicit: Path | None, parser: argparse.ArgumentParser) -> Path
     return games[0]
 
 
-def resolve_unrealpak(explicit: Path | None, parser: argparse.ArgumentParser) -> Path:
-    if explicit:
-        exe = explicit.expanduser().resolve()
-        if not exe.is_file():
-            parser.error(f"UnrealPak executable not found: {exe}")
-        return exe
-    import os
-
-    env = os.environ.get("ASA_UNREALPAK")
-    if env:
-        exe = Path(env).expanduser().resolve()
-        if exe.is_file():
-            return exe
-        parser.error(f"ASA_UNREALPAK does not point to a file: {exe}")
-    candidates = find_unrealpak()
-    if not candidates:
-        parser.error("ARK DevKit UnrealPak not found; pass --unrealpak or set ASA_UNREALPAK")
-    if len(candidates) > 1:
-        parser.error("multiple ARK DevKit UnrealPak tools found; pass --unrealpak: " + ", ".join(map(str, candidates)))
-    return candidates[0]
-
-
 def resolve_repak(explicit: Path | None, parser: argparse.ArgumentParser) -> Path:
     if explicit:
         exe = explicit.expanduser().resolve()
@@ -88,10 +47,11 @@ def resolve_repak(explicit: Path | None, parser: argparse.ArgumentParser) -> Pat
             parser.error(f"ASA_REPAK does not point to a file: {exe}")
         return exe
     local = ROOT / "work" / "tools" / "repak.exe"
+    if local.is_file():
+        return local.resolve()
     located = shutil.which("repak.exe") or shutil.which("repak")
-    for candidate in (local, Path(located) if located else None):
-        if candidate and candidate.is_file():
-            return candidate.resolve()
+    if located:
+        return Path(located).resolve()
     parser.error("repak v0.2.3 not found; run `python tools/bootstrap.py` or pass --repak")
 
 
@@ -106,18 +66,14 @@ def run_repak(exe: Path, *args: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--game-path", type=Path, help="Explicit ASA installation directory")
-    parser.add_argument("--unrealpak", type=Path, help="UnrealPak.exe from the locally installed ARK DevKit")
     parser.add_argument("--repak", type=Path, help="repak v0.2.3 executable")
     args = parser.parse_args()
     game = resolve_game(args.game_path, parser)
-    unrealpak = resolve_unrealpak(args.unrealpak, parser)
     repak = resolve_repak(args.repak, parser)
     source_pak = game / PAK_REL
     if not source_pak.is_file():
         parser.error(f"required PAK not found: {source_pak}")
-    version = pak_version(source_pak)
-    if version != 12:
-        parser.error(f"unsupported/current game PAK version {version}; this extractor path is validated for ASA PAK v12")
+    reader = PakReader(source_pak)
 
     work = ROOT / "work"
     extract_root = work / "source"
@@ -127,19 +83,10 @@ def main() -> int:
     for path in (en_path, ru_path):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.unlink(missing_ok=True)
-    print(f"Game: {game}\nSource PAK v{version}: {source_pak}\nUnrealPak extractor: {unrealpak}\nrepak writer: {repak}")
-
-    index = run_unrealpak(unrealpak, str(source_pak), "-List")
+    print(f"Game: {game}\nSource PAK V12: {source_pak}\nExtractor: tools.pakv12 + cached ooz DLL\nrepak writer: {repak}")
     for language in ("en", "ru"):
         expected = f"ShooterGame/Content/Localization/ShooterGame/{language}/ShooterGame.locres"
-        lines = [line for line in index.splitlines() if f'"{expected}"' in line]
-        if len(lines) != 1:
-            raise RuntimeError(f"expected exactly one PAK index entry for {expected}; found {len(lines)}")
-        if "compression: Oodle" not in lines[0]:
-            print(f"Notice: PAK entry compression differs from prior observation: {lines[0].strip()}")
-        run_unrealpak(unrealpak, str(source_pak), "-Extract", str(extract_root), f"-Filter={expected}")
-    if not en_path.is_file() or not ru_path.is_file():
-        raise RuntimeError("UnrealPak reported success but did not create both expected LOCRES files")
+        (extract_root / Path(expected)).write_bytes(reader.extract('../../../' + expected))
 
     en, ru = parse(en_path.read_bytes()), parse(ru_path.read_bytes())
     en_dump, ru_dump = en.as_dict(), ru.as_dict()

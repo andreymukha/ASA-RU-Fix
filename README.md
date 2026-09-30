@@ -1,34 +1,55 @@
 # ASA RU Fix
 
-Windows-first project for Russian localization fixes in ARK: Survival Ascended. Each build extracts the currently installed official RU LOCRES and applies only project corrections; the full official translation is generated under ignored `work/` and is not kept in Git.
+Russian localization fixes for ARK: Survival Ascended on Windows 11 x64. **ARK DevKit: NOT REQUIRED.** Each build reads current official EN/RU resources from the installed game's PAK, applies corrections to the complete official RU LOCRES, and creates a verified patch. Official translations and generated/downloaded binaries are not committed.
 
 ## Build
 
-Requirements: Windows, Python 3.10+, Steam-installed ASA, ARK DevKit from Epic Games Launcher, and repak v0.2.3. Install repak into the ignored project cache with `python tools/bootstrap.py`; the script checks the official release ZIP SHA-256 before extracting it. The build auto-detects Steam libraries through `libraryfolders.vdf`, finds `UnrealPak.exe` from the Epic `ARK DevKit` manifest, and uses `work/tools/repak.exe` to write the patch.
+Requirements:
+
+- Windows x64, 64-bit Python 3.10+, Steam-installed ASA.
+- First ooz compilation: **Visual Studio 2022 Build Tools**, Desktop development with C++, MSVC x64 and Windows SDK. This compiler is independent of DevKit. A cached verified DLL needs no compiler on subsequent builds/bootstrap runs.
+- Internet for the first bootstrap download.
 
 ```powershell
 python tools/bootstrap.py
 python build.py
-# If automatic discovery is ambiguous or unavailable:
-python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended' --unrealpak 'D:\ARKDevkit\Engine\Binaries\Win64\UnrealPak.exe'
+# Optional explicit game installation:
+python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
 ```
 
-The current DevKit UnrealPak reads ASA's PAK v12 and extracts the two LOCRES files. repak writes a PAK v11 with mount point `../../../`; the build lists and unpacks it again to verify its exact path and contents. Output is `dist/ASA_RU_Fix_P.pak`; build never installs it. Extracted official files, dumps, staging files, tools, and verification files stay in ignored `work/`.
+Review `dist/ASA_RU_Fix_P.pak`. Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
+
+Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input.
+
+Scope: ASA's current **unencrypted PAK V12**, compact entries, None/Oodle compression. Unsupported versions, encrypted index/payload, missing exact paths, unknown compression and malformed ranges fail explicitly. Metadata and each extracted resource are capped at 64 MiB. Future storage-format changes may require reader updates; no silent alternative extractor exists. Use trusted installed game content: upstream ooz is not fuzz safe.
+
+## Bootstrap cache
+
+Artifacts, pinned source and licenses stay in ignored `work/tools/`. repak's official v0.2.3 ZIP and every ooz source file have pinned SHA-256. Bootstrap reuses verified downloads, restores repak from its cached ZIP if needed, and reuses ooz only when its source/build recipe and recorded DLL hash match. It does not download or compile on every run. Delete `work/tools/ooz/build.json` to rebuild from pinned source. Nothing is downloaded by `build.py`.
 
 ## Corrections
 
-Edit `data/corrections.json` as a JSON object from `namespace\tkey` to replacement Russian text. The key must exist in the currently installed official Russian LOCRES or the build fails. The current entry is a temporary `[RU FIX TEST]` marker documented in [TESTING.md](TESTING.md); remove it after the in-game check. `data/additions.json` remains empty and experimental: additions are rejected by the build.
+Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text. Every key must exist in current official RU LOCRES. Only corrections are stored in Git; the complete merged resource is generated in ignored `work/`.
 
-After an ARK update, run `python build.py` again to use the new official RU base. To review English-source changes between dumps, run `python delta.py OLD_EN.json NEW_EN.json`.
+The current correction is a temporary `[RU FIX TEST]` marker documented in [TESTING.md](TESTING.md). `data/additions.json` stays empty and experimental; non-empty additions are rejected. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
-## Install / uninstall
+## Optional validation
 
-After reviewing the PAK, install it later with `./install.ps1`; preview with `./install.ps1 -WhatIf`. It copies/replaces only `ASA_RU_Fix_P.pak`. Remove only that file with `./uninstall.ps1`; preview with `./uninstall.ps1 -WhatIf`.
+```powershell
+python -m unittest discover -s tests -v
+python tests/standalone_build.py
+```
 
-No claim is made about official server or anti-cheat compatibility.
+The second command runs the complete production build with filesystem, DLL, import and process guards; only cached repak may run. `tests/compare_devkit.py --unrealpak PATH_TO_REFERENCE_TOOL` is an optional development oracle comparison, never imported by production and not needed after removing DevKit. Recorded results: [TESTING.md](TESTING.md).
 
-## Tools and references
+## Install / uninstall later
 
-- LOCRES extraction from the source PAK: locally installed ARK DevKit `UnrealPak.exe` (not copied into this repository). It handles the game's Oodle-compressed files; no Oodle DLL is copied or required by our Python code.
-- Patch PAK writer/reader: [`trumank/repak`](https://github.com/trumank/repak), v0.2.3, MIT OR Apache-2.0. Bootstrap URL is the official Windows x64 release ZIP and its SHA-256 is pinned in `tools/bootstrap.py`. repak does not read the source game's PAK v12 in this workflow; it writes and reopens our PAK v11.
-- [TradFR](https://github.com/valentin-gosselin/ark-ascended-fr) and [ASA_fix_ru_loc](https://github.com/LeXa4894/ASA_fix_ru_loc) were technical references only. No source or binary from either project was copied; neither repository page exposed a license file.
+When you choose to install, preview with `./install.ps1 -WhatIf`, then run `./install.ps1`. It copies/replaces only `ASA_RU_Fix_P.pak`. Preview removal with `./uninstall.ps1 -WhatIf`; `./uninstall.ps1` removes only that patch. Game launch is separate. Visible menu placement and server/anti-cheat compatibility require a manual check.
+
+## Third-party components
+
+- [repak](https://github.com/trumank/repak), **v0.2.3**, **MIT OR Apache-2.0**: official Windows x64 release, SHA-256 pinned; existing patch writer preserved.
+- [powzix/ooz](https://github.com/powzix/ooz/tree/05038060aa68f9187ae9923b2388ca8db40e58d1), commit **05038060aa68f9187ae9923b2388ca8db40e58d1**, **GPL-3.0-or-later**: bootstrap compiles its decoder with our GPL C ABI bridge. Source, full license and DLL remain cache artifacts.
+- [TradFR](https://github.com/valentin-gosselin/ark-ascended-fr) was studied as a format reference. No explicit project license was found at the inspected commit; no source was copied verbatim.
+
+Provenance, license evidence and compilation details: [THIRD_PARTY.md](THIRD_PARTY.md).

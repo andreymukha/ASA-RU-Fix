@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import json
 import re
 import sys
 from pathlib import Path
@@ -53,29 +52,6 @@ def find_game() -> list[Path]:
         if manifest.is_file() and game.is_dir():
             found.append(game.resolve())
     return found
-
-
-def find_unrealpak() -> list[Path]:
-    """Find UnrealPak only inside Epic manifests labelled as an ARK DevKit."""
-    manifests = Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
-    if not manifests.is_dir():
-        return []
-    found: list[Path] = []
-    for manifest in manifests.glob("*.item"):
-        try:
-            data = json.loads(manifest.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        label = " ".join(str(data.get(key, "")) for key in ("DisplayName", "AppName", "InstallLocation"))
-        if not re.search(r"ARK.*DevKit|DevKit.*ARK", label, re.IGNORECASE):
-            continue
-        location = data.get("InstallLocation")
-        if not location:
-            continue
-        candidate = Path(location) / "Engine" / "Binaries" / "Win64" / "UnrealPak.exe"
-        if candidate.is_file():
-            found.append(candidate.resolve())
-    return list(dict.fromkeys(found))
 
 
 if __name__ == "__main__":

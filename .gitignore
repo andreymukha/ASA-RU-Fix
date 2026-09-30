@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.serena/
 work/*
 !work/.gitkeep
 dist/*
