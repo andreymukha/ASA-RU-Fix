@@ -33,6 +33,18 @@ Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text.
 
 Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stays empty and experimental; non-empty additions are rejected. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
+## Deterministic translation audit
+
+After a build refreshes official `work/en.json` and `work/ru.json`, run:
+
+```powershell
+python tools/audit.py
+```
+
+The standard-library script deterministically exports `audit/all_strings.csv`, `audit/suspicious.csv` and `audit/summary.json`. CSVs use UTF-8 with BOM and proper quoting. The audit uses mechanical filters only: it uses no AI, does not judge translation quality, and never edits translations or corrections. It compares official EN/RU and shows project corrections separately for an outside manual or semantic review. Generated `audit/` files are gitignored.
+
+`python -m unittest discover -s tests -v` includes focused audit fixtures for CSV quoting, placeholders, markup, missing keys, repeated source/translation, known terms and corrections.
+
 ## Optional validation
 
 ```powershell

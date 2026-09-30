@@ -1,0 +1,10 @@
+{
+  "known_bad_terms": [
+    {
+      "full_key": "Content\t1408111756",
+      "en": "back",
+      "ru": "спина",
+      "note": "This exact official RU key was visually confirmed as the mode selection screen's Back button; project correction is Назад."
+    }
+  ]
+}

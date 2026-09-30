@@ -6,6 +6,7 @@ work/*
 !work/.gitkeep
 dist/*
 !dist/.gitkeep
+audit/
 *.pak
 *.locres
 *.dll
