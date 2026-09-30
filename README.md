@@ -4,15 +4,16 @@ Windows-first project for Russian localization fixes in ARK: Survival Ascended. 
 
 ## Build
 
-Requirements: Windows, Python 3.10+, Steam-installed ASA, and ARK DevKit installed through Epic Games Launcher. The build auto-detects Steam libraries through `libraryfolders.vdf` and finds `UnrealPak.exe` from the Epic `ARK DevKit` manifest.
+Requirements: Windows, Python 3.10+, Steam-installed ASA, ARK DevKit from Epic Games Launcher, and repak v0.2.3. Install repak into the ignored project cache with `python tools/bootstrap.py`; the script checks the official release ZIP SHA-256 before extracting it. The build auto-detects Steam libraries through `libraryfolders.vdf`, finds `UnrealPak.exe` from the Epic `ARK DevKit` manifest, and uses `work/tools/repak.exe` to write the patch.
 
 ```powershell
+python tools/bootstrap.py
 python build.py
 # If automatic discovery is ambiguous or unavailable:
 python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended' --unrealpak 'D:\ARKDevkit\Engine\Binaries\Win64\UnrealPak.exe'
 ```
 
-The current DevKit UnrealPak reads ASA's PAK v12, extracts the two LOCRES files, builds the patch PAK, then lists and extracts it again for verification. Output is `dist/ASA_RU_Fix_P.pak`; build never installs it. Extracted official files, dumps, staging files, and verification files stay in ignored `work/`.
+The current DevKit UnrealPak reads ASA's PAK v12 and extracts the two LOCRES files. repak writes a PAK v11 with mount point `../../../`; the build lists and unpacks it again to verify its exact path and contents. Output is `dist/ASA_RU_Fix_P.pak`; build never installs it. Extracted official files, dumps, staging files, tools, and verification files stay in ignored `work/`.
 
 ## Corrections
 
@@ -28,6 +29,6 @@ No claim is made about official server or anti-cheat compatibility.
 
 ## Tools and references
 
-- PAK/LOCRES extraction and patch PAK creation: the locally installed ARK DevKit `UnrealPak.exe` (not copied into this repository). Oodle decompression is handled by this Epic tool; no Oodle DLL is copied or required by our Python code.
-- `trumank/repak` v0.2.3 (MIT OR Apache-2.0) was evaluated as the preferred PAK v11 writer, but the release ZIP could not be downloaded in this environment. It is not required: the DevKit UnrealPak was verified to read the current v12 game PAK, write a patch PAK, and reopen/extract that PAK. The produced mount point is `../../../ShooterGame/Content/Localization/ShooterGame/ru/` and its entry is `ShooterGame.locres`; together they resolve to the required resource path.
+- LOCRES extraction from the source PAK: locally installed ARK DevKit `UnrealPak.exe` (not copied into this repository). It handles the game's Oodle-compressed files; no Oodle DLL is copied or required by our Python code.
+- Patch PAK writer/reader: [`trumank/repak`](https://github.com/trumank/repak), v0.2.3, MIT OR Apache-2.0. Bootstrap URL is the official Windows x64 release ZIP and its SHA-256 is pinned in `tools/bootstrap.py`. repak does not read the source game's PAK v12 in this workflow; it writes and reopens our PAK v11.
 - [TradFR](https://github.com/valentin-gosselin/ark-ascended-fr) and [ASA_fix_ru_loc](https://github.com/LeXa4894/ASA_fix_ru_loc) were technical references only. No source or binary from either project was copied; neither repository page exposed a license file.

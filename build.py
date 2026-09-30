@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
+import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -74,13 +75,43 @@ def resolve_unrealpak(explicit: Path | None, parser: argparse.ArgumentParser) ->
     return candidates[0]
 
 
+def resolve_repak(explicit: Path | None, parser: argparse.ArgumentParser) -> Path:
+    if explicit:
+        exe = explicit.expanduser().resolve()
+        if not exe.is_file():
+            parser.error(f"repak executable not found: {exe}")
+        return exe
+    env = os.environ.get("ASA_REPAK")
+    if env:
+        exe = Path(env).expanduser().resolve()
+        if not exe.is_file():
+            parser.error(f"ASA_REPAK does not point to a file: {exe}")
+        return exe
+    local = ROOT / "work" / "tools" / "repak.exe"
+    located = shutil.which("repak.exe") or shutil.which("repak")
+    for candidate in (local, Path(located) if located else None):
+        if candidate and candidate.is_file():
+            return candidate.resolve()
+    parser.error("repak v0.2.3 not found; run `python tools/bootstrap.py` or pass --repak")
+
+
+def run_repak(exe: Path, *args: str) -> str:
+    result = subprocess.run([str(exe), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    output = result.stdout + result.stderr
+    if result.returncode:
+        raise RuntimeError(f"repak failed ({result.returncode}): {' '.join(args)}\n{output[-4000:]}")
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--game-path", type=Path, help="Explicit ASA installation directory")
     parser.add_argument("--unrealpak", type=Path, help="UnrealPak.exe from the locally installed ARK DevKit")
+    parser.add_argument("--repak", type=Path, help="repak v0.2.3 executable")
     args = parser.parse_args()
     game = resolve_game(args.game_path, parser)
     unrealpak = resolve_unrealpak(args.unrealpak, parser)
+    repak = resolve_repak(args.repak, parser)
     source_pak = game / PAK_REL
     if not source_pak.is_file():
         parser.error(f"required PAK not found: {source_pak}")
@@ -96,7 +127,7 @@ def main() -> int:
     for path in (en_path, ru_path):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.unlink(missing_ok=True)
-    print(f"Game: {game}\nSource PAK v{version}: {source_pak}\nUnrealPak: {unrealpak}")
+    print(f"Game: {game}\nSource PAK v{version}: {source_pak}\nUnrealPak extractor: {unrealpak}\nrepak writer: {repak}")
 
     index = run_unrealpak(unrealpak, str(source_pak), "-List")
     for language in ("en", "ru"):
@@ -142,31 +173,24 @@ def main() -> int:
     staged = stage_root / Path(INTERNAL)
     staged.parent.mkdir(parents=True, exist_ok=True)
     staged.write_bytes(rebuilt)
-    response = work / "pak_response.txt"
-    # UnrealPak uses the second response-file column as the archive mount path.
-    response.write_text(f'"{staged.resolve()}" "../../../{INTERNAL}"\n', encoding="ascii")
     dist = ROOT / "dist" / "ASA_RU_Fix_P.pak"
     dist.parent.mkdir(parents=True, exist_ok=True)
     dist.unlink(missing_ok=True)
-    run_unrealpak(unrealpak, str(dist), f"-Create={response.resolve()}")
-
-    listing = run_unrealpak(unrealpak, str(dist), "-List")
-    mount_match = re.search(r'Listing .*? with mount point "([^"]+)"', listing)
-    file_match = re.search(r'^.*"([^"]*ShooterGame\.locres)" offset:', listing, re.MULTILINE)
-    if not mount_match or not file_match:
-        raise RuntimeError(f"could not verify patch PAK path from UnrealPak -List output:\n{listing[-3000:]}")
-    mount = mount_match.group(1).replace("\\", "/")
-    leaf = file_match.group(1).replace("\\", "/")
-    effective = (mount + leaf).replace("../../../", "", 1).lstrip("/")
-    if effective.casefold() != INTERNAL.casefold():
-        raise RuntimeError(f"patch PAK contains unexpected path: mount={mount!r}, entry={leaf!r}, effective={effective!r}")
-    print(f"PAK mount point: {mount}; entry: {leaf}; effective path: {effective}")
+    run_repak(repak, "pack", "--version", "V11", "--mount-point", "../../../", "--quiet", str(stage_root), str(dist))
+    listing = run_repak(repak, "list", str(dist))
+    entries = [line.strip().replace("\\", "/") for line in listing.splitlines() if line.strip()]
+    if entries != [INTERNAL]:
+        raise RuntimeError(f"patch PAK contains unexpected entries: {entries!r}")
+    info = run_repak(repak, "info", str(dist))
+    if "mount point: ../../../" not in info or "version: V11" not in info:
+        raise RuntimeError(f"patch PAK has unexpected mount point/version:\n{info}")
+    print(f"PAK mount point: ../../../; entry: {entries[0]}; version: V11")
 
     verify_root = work / "pak_verify"
     verify_root.mkdir(parents=True, exist_ok=True)
-    extracted = verify_root / "ShooterGame.locres"
+    extracted = verify_root / Path(INTERNAL)
     extracted.unlink(missing_ok=True)
-    run_unrealpak(unrealpak, str(dist), "-Extract", str(verify_root), "-Filter=ShooterGame.locres")
+    run_repak(repak, "unpack", "--quiet", "--force", "--output", str(verify_root), "--include", INTERNAL, str(dist))
     if not extracted.is_file():
         raise RuntimeError("patch PAK could not be extracted back to ShooterGame.locres")
     extracted_resource = parse(extracted.read_bytes())
@@ -175,7 +199,8 @@ def main() -> int:
             raise RuntimeError(f"correction did not survive PAK round-trip: {key!r}")
     if extracted.read_bytes() != rebuilt:
         raise RuntimeError("LOCRES bytes extracted from patch PAK differ from the rebuilt input")
-    print(f"Verified patch: {dist} ({dist.stat().st_size:,} bytes); reopened and extracted LOCRES v{extracted_resource.version}, {len(extracted_resource.entries):,} keys")
+    detail = "; ".join(part.strip() for part in info.splitlines() if part.strip())
+    print(f"Verified patch: {dist} ({dist.stat().st_size:,} bytes); {detail}; reopened and extracted LOCRES v{extracted_resource.version}, {len(extracted_resource.entries):,} keys")
     return 0
 
 
