@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -11,6 +12,7 @@ import sys
 from pathlib import Path
 
 from tools.locres import LocresError, load_edits, parse, serialize
+from tools.corrections import validate_corrections, verify_applied
 from tools.steam import find_game
 from tools.pakv12 import PakReader
 
@@ -100,9 +102,7 @@ def main() -> int:
     if additions:
         raise RuntimeError("additions.json is experimental and non-empty additions are not supported; clear it before building")
     corrections = load_edits(ROOT / "data" / "corrections.json")
-    for key in corrections:
-        if key not in ru_dump:
-            raise LocresError(f"correction key is absent from current official RU LOCRES: {key!r}")
+    correction_validation = validate_corrections(corrections, en_dump, ru_dump)
     rebuilt = serialize(ru, corrections)
     rebuilt_resource = parse(rebuilt)
     merged = {**ru_dump, **corrections}
@@ -141,11 +141,24 @@ def main() -> int:
     if not extracted.is_file():
         raise RuntimeError("patch PAK could not be extracted back to ShooterGame.locres")
     extracted_resource = parse(extracted.read_bytes())
-    for key, value in corrections.items():
-        if extracted_resource.as_dict().get(key) != value:
-            raise RuntimeError(f"correction did not survive PAK round-trip: {key!r}")
+    extracted_dump = extracted_resource.as_dict()
+    applied = verify_applied(corrections, extracted_dump)
+    if extracted_dump != merged:
+        raise LocresError("PAK-extracted LOCRES failed full dictionary verification")
     if extracted.read_bytes() != rebuilt:
         raise RuntimeError("LOCRES bytes extracted from patch PAK differ from the rebuilt input")
+    validation_report = {
+        "corrections_preflight": correction_validation,
+        "corrections_verification": applied,
+        "stock_en_keys": len(en_dump), "stock_ru_keys": len(ru_dump),
+        "stock_en_locres_sha256": hashlib.sha256(en_path.read_bytes()).hexdigest(),
+        "stock_ru_locres_sha256": hashlib.sha256(ru_path.read_bytes()).hexdigest(),
+        "pak_path": str(dist), "pak_size": dist.stat().st_size,
+        "pak_sha256": hashlib.sha256(dist.read_bytes()).hexdigest(),
+    }
+    (work / "build_validation.json").write_text(
+        json.dumps(validation_report, indent=2) + "\n", encoding="utf-8")
+    print(f"Post-build corrections: {applied['actual']}/{applied['expected']} MATCH; mismatches: {applied['mismatches']}")
     detail = "; ".join(part.strip() for part in info.splitlines() if part.strip())
     print(f"Verified patch: {dist} ({dist.stat().st_size:,} bytes); {detail}; reopened and extracted LOCRES v{extracted_resource.version}, {len(extracted_resource.entries):,} keys")
     return 0

@@ -1,5 +1,23 @@
 # Standalone verification — 2026-09-30
 
+## First large external review batch — verified
+
+Input: `review_cumulative_1059_corrections_candidate.json`, 1059 external semantic-review candidates; original SHA-256 `a95aa3060c4967aed9a9de04918a0b43d7ed4e0d6ef7c6a10fcc264a8a271b76`. Fresh production extraction confirmed 39,201 EN and 35,407 RU keys. The initial preflight rejected 41 keys absent from stock RU and three damaged RichColor replacements. Following the user's instructions, the 41 keys were preserved in ignored `work/review/deferred_missing_ru.json`; the three exact user-provided replacements were applied only in `work/review/importable_1018.json`. Original review files were archived unchanged in `work/review/`.
+
+Final merge: **1018 new + 1 existing = 1019 corrections**, zero conflicts and zero invalid/missing keys in the imported subset. `data/additions.json` remains empty. Mechanical preflight passed for all corrections, including 236 strings with placeholders and 23 with RichText. Source template boundaries such as `{color} ... </>` remain identical to EN; decorative `<<TEXT>>` is excluded from markup parsing.
+
+`python build.py` passed with cached standalone tools. repak pack/info/list/unpack verified V11, mount `../../../`, and exactly the RU LOCRES entry. The reopened PAK-extracted LOCRES contains all **1019 / 1019 matching corrections; zero mismatches**, and its complete dictionary equals stock RU plus corrections. The extracted bytes equal the rebuilt input. Report: ignored `work/build_validation.json`.
+
+- Current PAK: `dist/ASA_RU_Fix_P.pak`
+- Size: **4,964,623 bytes**
+- SHA-256: `5486fad804ee4215aea29cc57e7719562646b59d39812d6d8cf069968812c28d`
+
+Regression checks confirm `Content<TAB>1408111756 = Назад`, `GraphLiteral<TAB>63761803 = Играть`, and imported corrections for Master Volume, Music Volume, SFX Volume, Turret and Manta Ray. Placeholder samples were compared against EN, stock RU and the reopened PAK resource; their exact source tokens survive.
+
+The post-import stock audit reports **1019 already_corrected** entries. Every audit RU value still equals stock RU, and every `our_ru` matches corrections. Stock EN/RU dump hashes and stock diagnostic counts are unchanged by the batch, proving that patched localization does not hide official errors.
+
+**51 unit tests pass**, including candidate merge/identical duplicates, conflict rejection, invalid and missing keys, placeholder names with spaces, repetition, printf positions/precision, Cyrillic token corruption, RichText balance/source fragments, duplicate JSON rejection, and verification of all applied corrections. The batch PAK was not installed or tested in the running game by the agent; the earlier user-confirmed Back-button test below remains the in-game evidence.
+
 ## Fresh oracle comparison
 
 Source: installed ASA `F:\SteamLibrary\steamapps\common\ARK Survival Ascended\ShooterGame\Content\Paks\pakchunk0-Windows.pak`, 1,565,454,770 bytes, V12, mount `../../../`, 2,360 entries, Oodle.

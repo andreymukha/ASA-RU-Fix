@@ -19,7 +19,7 @@ python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascen
 
 Review `dist/ASA_RU_Fix_P.pak`. Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
 
-Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input.
+Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. After unpacking the PAK, every correction must match its expected value; counts and artifact SHA-256 are recorded in ignored `work/build_validation.json`.
 
 Scope: ASA's current **unencrypted PAK V12**, compact entries, None/Oodle compression. Unsupported versions, encrypted index/payload, missing exact paths, unknown compression and malformed ranges fail explicitly. Metadata and each extracted resource are capped at 64 MiB. Future storage-format changes may require reader updates; no silent alternative extractor exists. Use trusted installed game content: upstream ooz is not fuzz safe.
 
@@ -33,6 +33,10 @@ Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text.
 
 Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stays empty and experimental; non-empty additions are rejected. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
+The first large batch from an **external semantic review** is integrated: **1019 total corrections** (1018 new plus the verified Back fix). Of 1059 original candidates, 41 EN-only keys are deferred in ignored `work/review/deferred_missing_ru.json`; adding new RU keys is outside the current correction pipeline. Three RichColor replacements were supplied by the user before import. Raw review archives and the prepared `importable_1018.json` remain in ignored `work/review/`.
+
+For future reviewed candidates, first run the production build to refresh the stock dumps, then run `python -m tools.corrections --candidate PATH_TO_CUMULATIVE.json` for a dry-run preflight. `--expected-new` and `--expected-total` can enforce batch counts; `--apply` writes a sorted UTF-8 corrections file only after validation succeeds. Conflicting existing values, duplicate JSON keys, missing official keys, empty replacements, changed placeholders and damaged RichText fail explicitly. Rebuild with `python build.py` after importing.
+
 ## Deterministic translation audit
 
 After a build refreshes official `work/en.json` and `work/ru.json`, run:
@@ -41,7 +45,7 @@ After a build refreshes official `work/en.json` and `work/ru.json`, run:
 python tools/audit.py
 ```
 
-The standard-library script deterministically exports `audit/all_strings.csv`, `audit/suspicious.csv` and `audit/summary.json`. CSVs use UTF-8 with BOM and proper quoting. The audit uses mechanical filters only: it uses no AI, does not judge translation quality, and never edits translations or corrections. It compares official EN/RU and shows project corrections separately for an outside manual or semantic review. Generated `audit/` files are gitignored.
+The standard-library script deterministically exports `audit/all_strings.csv`, `audit/suspicious.csv`, separate missing-key and grouped consistency CSVs, and `audit/summary.json`. CSVs use UTF-8 with BOM and proper quoting. The audit uses mechanical filters only: it uses no AI, does not judge translation quality, and never edits translations or corrections. It always reads **stock** `work/en.json` and `work/ru.json`; `our_ru` and `already_corrected` expose project corrections separately, without masking official errors. It never reads patched `work/ru_rebuilt.json`. Generated `audit/` files are gitignored.
 
 `python -m unittest discover -s tests -v` includes focused audit fixtures for CSV quoting, placeholders, markup, missing keys, repeated source/translation, known terms and corrections.
 

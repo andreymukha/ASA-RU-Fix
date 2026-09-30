@@ -57,12 +57,12 @@ def main():
     # Static proof includes every project module in the production build and
     # bootstrap. The optional test scripts are deliberately outside this list.
     production = ['build.py', 'tools/steam.py', 'tools/locres.py', 'tools/pakv12.py',
-                  'tools/oodle.py', 'tools/bootstrap.py', 'tools/ooz_bridge.cpp']
+                  'tools/oodle.py', 'tools/bootstrap.py', 'tools/ooz_bridge.cpp', 'tools/corrections.py']
     for name in production:
         content = (ROOT / name).read_text(encoding='utf-8').lower()
         if any(word in content for word in ('devkit', 'unrealpak', 'epicgameslauncher')):
             raise RuntimeError(f'Production source still references a forbidden backend: {name}')
-    print('Production source search: no DevKit/UnrealPak/Epic lookup in 7 files', flush=True)
+    print(f'Production source search: no DevKit/UnrealPak/Epic lookup in {len(production)} files', flush=True)
     sys.addaudithook(audit)
     for name in ('stat', 'lstat', 'access', 'listdir', 'scandir', 'readlink'):
         setattr(os, name, guarded(getattr(os, name)))

@@ -214,8 +214,15 @@ def serialize(resource: Resource, edits: dict[str, str]) -> bytes:
 
 
 def load_edits(path: Path) -> dict[str, str]:
+    def unique_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise LocresError(f"duplicate JSON key in {path}: {key!r}")
+            result[key] = value
+        return result
     try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"), object_pairs_hook=unique_pairs)
     except (OSError, json.JSONDecodeError) as exc:
         raise LocresError(f"cannot read {path}: {exc}") from exc
     if not isinstance(data, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in data.items()):

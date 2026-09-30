@@ -7,6 +7,8 @@ work/*
 dist/*
 !dist/.gitkeep
 audit/
+/review_*.csv
+/review_*.json
 *.pak
 *.locres
 *.dll
