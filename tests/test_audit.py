@@ -6,7 +6,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from tools.audit import FLAGS, analyze, run_audit
+from tools.audit import FLAGS, analyze, consistency_reports, run_audit
 
 
 class AuditLogicTests(unittest.TestCase):
@@ -53,17 +53,101 @@ class AuditLogicTests(unittest.TestCase):
                          {'n\ta': '<RichColor>Привет</>'})
         self.assertTrue(attr[0]['tag_mismatch'])
 
+    def test_double_angle_tokens_are_not_markup(self):
+        row = self.rows({'n\ta': '<<TITLE>>'}, {'n\ta': '<<TITLE>>'})[0]
+        self.assertFalse(row['tag_mismatch'])
+
+    def test_unreal_rich_text_tags_are_markup(self):
+        rows = self.rows({'n\ta': '<RichColor Color="red">Hello</>'},
+                         {'n\ta': '<RichColor Color="red">Привет</>'})
+        self.assertFalse(rows[0]['tag_mismatch'])
+        self.assertTrue(self.rows({'n\ta': '<RichColor Color="red">Hello</>'},
+                                  {'n\ta': 'Привет'})[0]['tag_mismatch'])
+
     def test_same_english_multiple_russian(self):
         rows = self.rows({'a\t1': 'Back', 'b\t2': 'Back'},
                          {'a\t1': 'Назад', 'b\t2': 'Спина'})
         self.assertTrue(all(row['same_en_multiple_ru'] for row in rows))
-        self.assertIn('Спина', rows[0]['same_en_other_ru'])
+        en_groups, _ = consistency_reports(rows)
+        self.assertEqual(en_groups[0]['distinct_ru_count'], 2)
+        self.assertNotIn('same_en_other_ru', rows[0])
 
     def test_same_russian_multiple_english(self):
         rows = self.rows({'a\t1': 'Back', 'b\t2': 'spine'},
                          {'a\t1': 'спина', 'b\t2': 'спина'})
         self.assertTrue(all(row['same_ru_multiple_en'] for row in rows))
-        self.assertIn('spine', rows[0]['same_ru_other_en'])
+        _, ru_groups = consistency_reports(rows)
+        self.assertEqual(ru_groups[0]['distinct_en_count'], 2)
+        self.assertNotIn('same_ru_other_en', rows[0])
+
+    def test_missing_russian_values_do_not_group_as_shared_translation(self):
+        rows = self.rows({'a\t1': 'Save', 'b\t2': 'Load', 'c\t3': 'Back'},
+                         {'a\t1': '', 'b\t2': '  ', 'c\t3': 'Назад'})
+        missing = [row for row in rows if row['missing_ru']]
+        self.assertEqual(len(missing), 2)
+        self.assertTrue(all(not row['same_ru_multiple_en'] for row in missing))
+        self.assertTrue(all('same_ru_other_en' not in row for row in missing))
+
+    def test_empty_english_does_not_form_same_english_group(self):
+        rows = self.rows({'a\t1': '', 'b\t2': ''},
+                         {'a\t1': 'Строка А', 'b\t2': 'Строка Б'})
+        self.assertTrue(all(not row['same_en_multiple_ru'] for row in rows))
+        self.assertTrue(all('same_en_other_ru' not in row for row in rows))
+        self.assertTrue(all(row['missing_en'] for row in rows))
+
+    def test_consistency_reports_group_once_and_skip_empty_values(self):
+        rows = self.rows({'a\t1': 'Back', 'b\t2': 'Back', 'c\t3': 'Save',
+                          'd\t4': '', 'e\t5': ''},
+                         {'a\t1': 'Назад', 'b\t2': 'Спина', 'c\t3': '',
+                          'd\t4': 'Один', 'e\t5': 'Два'})
+        en_groups, ru_groups = consistency_reports(rows)
+        self.assertEqual(len(en_groups), 1)
+        self.assertEqual(en_groups[0]['en'], 'Back')
+        self.assertEqual(en_groups[0]['occurrences'], 2)
+        self.assertEqual(en_groups[0]['distinct_ru_count'], 2)
+        self.assertEqual(len(ru_groups), 0)
+
+    def test_consistency_variant_preview_is_capped_but_count_is_complete(self):
+        en = {f'n\t{i}': 'Same' for i in range(25)}
+        ru = {f'n\t{i}': f'Вариант {i}' for i in range(25)}
+        en_groups, _ = consistency_reports(self.rows(en, ru))
+        self.assertEqual(en_groups[0]['distinct_ru_count'], 25)
+        self.assertEqual(len(json.loads(en_groups[0]['ru_variants'])), 20)
+
+    def test_consistency_only_flag_does_not_make_suspicious(self):
+        rows = self.rows({'a\t1': 'Back', 'b\t2': 'Back'},
+                         {'a\t1': 'Назад', 'b\t2': 'Спина'})
+        self.assertTrue(all(row['same_en_multiple_ru'] for row in rows))
+        self.assertTrue(all(not row['suspicious'] for row in rows))
+
+    def test_technical_identifiers_are_marked_and_filtered_from_suspicious(self):
+        rows = self.rows(
+            {'n\tpath': '/Game/Genesis2/Sounds/Audio_Cue',
+             'n\tidentifier': 'CorruptedMaze_AddPlayers_Title',
+             'n\tdebug': '(Hunt_Dino_Lunar_06) ServerSidePoint=123'},
+            {'n\tpath': '/Game/Genesis2/Sounds/Audio_Cue',
+             'n\tidentifier': 'CorruptedMaze_AddPlayers_Title',
+             'n\tdebug': '(Hunt_Dino_Lunar_06) ServerSidePoint=123'})
+        self.assertTrue(all(row['technical_likely'] for row in rows))
+        self.assertTrue(all(row['untranslated'] for row in rows))
+        self.assertTrue(all(not row['suspicious'] for row in rows))
+
+    def test_natural_russian_ui_is_not_technical(self):
+        row = self.rows({'n\tback': 'Back'}, {'n\tback': 'Назад'})[0]
+        self.assertFalse(row['technical_likely'])
+
+    def test_missing_keys_are_not_suspicious(self):
+        rows = self.rows({'n\tmissing': 'Save'}, {})
+        self.assertTrue(rows[0]['missing_ru'])
+        self.assertFalse(rows[0]['suspicious'])
+
+    def test_known_back_correction_remains_suspicious(self):
+        key = 'Content\t1408111756'
+        row = self.rows({key: 'back'}, {key: 'спина'}, {key: 'Назад'},
+                        [{'full_key': key, 'en': 'back', 'ru': 'спина'}])[0]
+        self.assertTrue(row['case_suspicious'])
+        self.assertTrue(row['known_bad_term'])
+        self.assertTrue(row['suspicious'])
 
     def test_corrected_key_audits_official_ru_and_exposes_our_ru(self):
         key = 'Content\t1408111756'
@@ -103,9 +187,9 @@ class AuditLogicTests(unittest.TestCase):
         self.assertFalse(rows[1]['case_suspicious'])
 
     def test_newlines_latin_and_length_diagnostics(self):
-        rows = self.rows({'n\ta': 'Short\n\nline', 'n\tb': 'This setting configures all accessibility options'},
+        rows = self.rows({'n\ta': 'Short\n\nline', 'n\tb': 'A very long source description ' * 12},
                          {'n\ta': 'Очень длинная english строка и текст\nздесь',
-                          'n\tb': 'Звук настроек'})
+                          'n\tb': 'Очень длинная строка интерфейса'})
         self.assertTrue(rows[0]['newline_mismatch'])
         self.assertTrue(rows[0]['latin_in_ru'])
         self.assertTrue(rows[1]['suspicious_length'])
@@ -136,6 +220,18 @@ class AuditLogicTests(unittest.TestCase):
             self.assertEqual((summary['en_key_count'], summary['ru_key_count'], summary['union_key_count']), (2, 2, 3))
             with (root / 'audit/all_strings.csv').open(encoding='utf-8-sig', newline='') as source:
                 self.assertEqual(len(list(csv.DictReader(source))), 3)
+            with (root / 'audit/missing_ru.csv').open(encoding='utf-8-sig', newline='') as source:
+                self.assertEqual(len(list(csv.DictReader(source))), 1)
+            with (root / 'audit/missing_en.csv').open(encoding='utf-8-sig', newline='') as source:
+                self.assertEqual(len(list(csv.DictReader(source))), 1)
+            with (root / 'audit/consistency_en.csv').open(encoding='utf-8-sig', newline='') as source:
+                self.assertEqual(list(csv.DictReader(source)), [])
+            with (root / 'audit/consistency_ru.csv').open(encoding='utf-8-sig', newline='') as source:
+                self.assertEqual(list(csv.DictReader(source)), [])
+            with (root / 'audit/suspicious.csv').open(encoding='utf-8-sig', newline='') as source:
+                suspicious = list(csv.DictReader(source))
+            self.assertTrue(all('same_en_other_ru' not in row for row in suspicious))
+            self.assertTrue(all('same_ru_other_en' not in row for row in suspicious))
             self.assertEqual(json.loads((root / 'audit/summary.json').read_text(encoding='utf-8'))['union_key_count'], 3)
 
 

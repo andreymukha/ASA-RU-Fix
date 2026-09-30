@@ -12,16 +12,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FLAGS = (
-    'untranslated', 'missing_ru', 'missing_en', 'latin_in_ru',
+    'technical_likely', 'untranslated', 'missing_ru', 'missing_en', 'latin_in_ru',
     'placeholder_mismatch', 'tag_mismatch', 'newline_mismatch',
     'suspicious_length', 'same_en_multiple_ru', 'same_ru_multiple_en',
     'case_suspicious', 'known_bad_term',
 )
 ALL_FIELDS = (
     'key', 'namespace', 'full_key', 'en', 'ru', 'our_ru', 'already_corrected',
-    *FLAGS, 'same_en_other_ru', 'same_ru_other_en', 'heuristic_score', 'suspicious', 'flags',
+    *FLAGS, 'heuristic_score', 'suspicious', 'flags',
 )
-SUSPICIOUS_FIELDS = ALL_FIELDS
+SUSPICIOUS_FIELDS = (
+    'namespace', 'key', 'full_key', 'en', 'ru', 'our_ru', 'already_corrected',
+    'technical_likely', 'untranslated', 'latin_in_ru', 'placeholder_mismatch',
+    'tag_mismatch', 'case_suspicious', 'suspicious_length', 'known_bad_term',
+    'heuristic_score', 'flags',
+)
+MISSING_FIELDS = ('namespace', 'key', 'full_key', 'en')
+CONSISTENCY_EN_FIELDS = ('en', 'occurrences', 'distinct_ru_count', 'ru_variants')
+CONSISTENCY_RU_FIELDS = ('ru', 'occurrences', 'distinct_en_count', 'en_variants')
+VARIANT_PREVIEW_LIMIT = 20
 
 # Recognized English UI names, abbreviations, input symbols and measurement units.
 # This is a conservative whitelist, not a translation dictionary.
@@ -34,7 +43,7 @@ SAFE_LATIN = frozenset('''
     insert home end pageup pagedown up down left right numpad capslock
 '''.split())
 
-TAG_RE = re.compile(r'<\s*(?:(/)?([A-Za-z][\w:.-]*)\b[^<>]*?(/?)|(/))\s*>')
+TAG_RE = re.compile(r'(?<!<)<\s*(?:(/)?([A-Za-z][\w:.-]*)\b[^<>]*?(/?)|(/))\s*>(?!>)')
 TAG_ATTRIBUTE_RE = re.compile(r'([A-Za-z_:][\w:.-]*)\s*=')
 BRACE_RE = re.compile(r'\{\s*([A-Za-z_][\w.-]*|\d+)(?:\s*:[^{}]*)?\s*\}')
 PRINTF_RE = re.compile(
@@ -46,6 +55,10 @@ LATIN_RE = re.compile(r'[A-Za-z]{3,}')
 URL_RE = re.compile(r'\b(?:https?://|www\.)[^\s<>{}]+', re.IGNORECASE)
 INPUT_KEY_RE = re.compile(r'\b(?:Gamepad|Mouse|Keyboard|Controller)_[A-Za-z0-9_+-]+\b', re.IGNORECASE)
 CYRILLIC_LOWER_RE = re.compile(r'^[а-яё]')
+ASSET_PATH_RE = re.compile(r'(?:^|[\s(])/(?:Game|Script|Engine)/[A-Za-z0-9_./-]+', re.IGNORECASE)
+IDENTIFIER_RE = re.compile(r'[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+')
+DEBUG_POINT_RE = re.compile(r'\bServerSidePoint\b', re.IGNORECASE)
+VARIABLE_DUMP_RE = re.compile(r'^[A-Za-z_][\w.]*\s*[:=]\s*[^\r\n]+$')
 
 
 def _normalize(value: str) -> str:
@@ -124,6 +137,21 @@ def _untranslated_noise(value: str) -> bool:
     return _is_noise(text) or re.fullmatch(r'[\d\W_]+', text, re.UNICODE) is not None
 
 
+def _technical_likely(english: str, russian: str) -> bool:
+    """Flag strong structural evidence of internal identifiers or debug dumps."""
+    for value in (english, russian):
+        text = value.strip()
+        if not text:
+            continue
+        if ASSET_PATH_RE.search(text) or DEBUG_POINT_RE.search(text):
+            return True
+        if IDENTIFIER_RE.fullmatch(text):
+            return True
+        if VARIABLE_DUMP_RE.fullmatch(text) and not re.search(r'[А-Яа-яЁё]{3}', text):
+            return True
+    return False
+
+
 def _case_suspicious(en: str, ru: str, known_ui: bool) -> bool:
     russian = _plain(ru).strip()
     english = _plain(en).strip()
@@ -147,10 +175,44 @@ def _group_alternatives(rows: list[dict], source_field: str, target_field: str) 
     grouped: dict[str, dict[str, str]] = defaultdict(dict)
     for row in rows:
         source, target = row[source_field], row[target_field]
-        if not source or not target:
+        if not source.strip() or not target.strip():
             continue
         grouped[_normalize(source)].setdefault(_normalize(target), target.strip())
     return {source: values for source, values in grouped.items() if len(values) > 1}
+
+
+def consistency_reports(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Build one bounded-preview report row for each conflicting nonempty value."""
+    def report(source_field: str, target_field: str, variant_field: str, count_field: str) -> list[dict]:
+        grouped: dict[str, dict[str, str]] = defaultdict(dict)
+        occurrences: Counter = Counter()
+        originals: dict[str, str] = {}
+        for row in rows:
+            source, target = row[source_field].strip(), row[target_field].strip()
+            if not source or not target:
+                continue
+            norm_source, norm_target = _normalize(source), _normalize(target)
+            originals.setdefault(norm_source, source)
+            occurrences[norm_source] += 1
+            grouped[norm_source].setdefault(norm_target, target)
+        result = []
+        for norm_source, variants in sorted(grouped.items()):
+            if len(variants) < 2:
+                continue
+            ordered = sorted(variants.items(), key=lambda item: (item[0], item[1]))
+            result.append({
+                source_field: originals[norm_source],
+                'occurrences': occurrences[norm_source],
+                count_field: len(variants),
+                variant_field: json.dumps([value for _, value in ordered[:VARIANT_PREVIEW_LIMIT]],
+                                          ensure_ascii=False, separators=(',', ':')),
+            })
+        return result
+
+    return (
+        report('en', 'ru', 'ru_variants', 'distinct_ru_count'),
+        report('ru', 'en', 'en_variants', 'distinct_en_count'),
+    )
 
 
 def analyze(en: dict[str, str], ru: dict[str, str], corrections: dict[str, str] | None = None,
@@ -180,12 +242,11 @@ def analyze(en: dict[str, str], ru: dict[str, str], corrections: dict[str, str] 
     for row in rows:
         english, russian, full_key = row['en'], row['ru'], row['full_key']
         en_norm, ru_norm = _normalize(english), _normalize(russian)
-        other_ru = same_en.get(en_norm, {})
-        other_en = same_ru.get(ru_norm, {})
         flags = {
+            'technical_likely': _technical_likely(english, russian),
             'untranslated': bool(english and russian and english.strip().casefold() == russian.strip().casefold()),
-            'missing_ru': full_key in en and full_key not in ru,
-            'missing_en': full_key in ru and full_key not in en,
+            'missing_ru': full_key in en and not ru.get(full_key, '').strip(),
+            'missing_en': full_key in ru and not en.get(full_key, '').strip(),
             'latin_in_ru': bool(russian and _latin_in_ru(russian, namespace)),
             'placeholder_mismatch': bool(english and russian and _placeholders(english) != _placeholders(russian)),
             'tag_mismatch': bool(english and russian and _tags(english) != _tags(russian)),
@@ -208,29 +269,25 @@ def analyze(en: dict[str, str], ru: dict[str, str], corrections: dict[str, str] 
             min(en_newlines, ru_newlines) * 2 <= max(en_newlines, ru_newlines)))
 
         en_length, ru_length = len(_plain(english)), len(_plain(russian))
-        if min(en_length, ru_length) >= 12:
+        if min(en_length, ru_length) >= 20:
             ratio = max(en_length, ru_length) / min(en_length, ru_length)
-            flags['suspicious_length'] = ratio >= 3.0
+            flags['suspicious_length'] = ratio >= 8.0
 
         score = 0
         for flag, weight in (
-            ('missing_ru', 10), ('placeholder_mismatch', 9), ('tag_mismatch', 9),
-            ('known_bad_term', 9), ('missing_en', 6), ('untranslated', 7),
-            ('latin_in_ru', 5), ('same_en_multiple_ru', 4),
-            ('same_ru_multiple_en', 4), ('case_suspicious', 4),
-            ('newline_mismatch', 2), ('suspicious_length', 1),
+            ('placeholder_mismatch', 9), ('tag_mismatch', 9), ('known_bad_term', 9),
+            ('untranslated', 7), ('latin_in_ru', 5), ('case_suspicious', 4),
+            ('suspicious_length', 1),
         ):
             if flags[flag]:
-                if flag != 'untranslated' or not _untranslated_noise(russian):
+                if flag == 'untranslated' and _untranslated_noise(russian):
+                    continue
+                if flags['technical_likely'] and flag in {'untranslated', 'latin_in_ru'}:
+                    continue
+                else:
                     score += weight
 
         row.update(flags)
-        row['same_en_other_ru'] = json.dumps(
-            sorted((value for normalized, value in other_ru.items() if normalized != ru_norm), key=lambda v: (_normalize(v), v)),
-            ensure_ascii=False, separators=(',', ':')) if other_ru else ''
-        row['same_ru_other_en'] = json.dumps(
-            sorted((value for normalized, value in other_en.items() if normalized != en_norm), key=lambda v: (_normalize(v), v)),
-            ensure_ascii=False, separators=(',', ':')) if other_en else ''
         row['heuristic_score'] = score
         row['suspicious'] = score > 0
         row['flags'] = ';'.join(name.upper() for name in FLAGS if flags[name])
@@ -275,15 +332,34 @@ def run_audit(root: Path = ROOT) -> dict:
     rows = analyze(en, ru, corrections, terms)
     suspicious = [row for row in rows if row['heuristic_score'] > 0]
     suspicious.sort(key=lambda row: (-row['heuristic_score'], row['full_key']))
+    consistency_en, consistency_ru = consistency_reports(rows)
+    missing_ru = [row for row in rows if row['missing_ru']]
+    missing_en = [row for row in rows if row['missing_en']]
     output_dir = root / 'audit'
     write_csv(output_dir / 'all_strings.csv', rows, ALL_FIELDS)
     write_csv(output_dir / 'suspicious.csv', suspicious, SUSPICIOUS_FIELDS)
+    write_csv(output_dir / 'missing_ru.csv', missing_ru, MISSING_FIELDS)
+    write_csv(output_dir / 'missing_en.csv', missing_en, MISSING_FIELDS)
+    write_csv(output_dir / 'consistency_en.csv', consistency_en, CONSISTENCY_EN_FIELDS)
+    write_csv(output_dir / 'consistency_ru.csv', consistency_ru, CONSISTENCY_RU_FIELDS)
 
     flag_counts = Counter(flag for row in rows for flag in FLAGS if row[flag])
     flag_counts['already_corrected'] = sum(row['already_corrected'] for row in rows)
+    ignored_reason_flags = ('placeholder_mismatch', 'tag_mismatch', 'case_suspicious', 'suspicious_length', 'known_bad_term')
+    technical_excluded = sum(
+        row['technical_likely'] and (
+            row['latin_in_ru'] or (row['untranslated'] and not _untranslated_noise(row['ru']))
+        )
+        and not any(row[flag] for flag in ignored_reason_flags)
+        for row in rows
+    )
     summary = {
         'en_key_count': len(en), 'ru_key_count': len(ru), 'union_key_count': len(rows),
         'suspicious_count': len(suspicious),
+        'missing_ru_count': len(missing_ru), 'missing_en_count': len(missing_en),
+        'consistency_en_group_count': len(consistency_en),
+        'consistency_ru_group_count': len(consistency_ru),
+        'technical_likely_excluded_count': technical_excluded,
         'flag_counts': {flag: flag_counts.get(flag, 0) for flag in (*FLAGS, 'already_corrected')},
         'heuristic_score_note': 'Deterministic review-priority score only; not translation quality or semantic judgment.',
         'inputs': {
@@ -295,6 +371,10 @@ def run_audit(root: Path = ROOT) -> dict:
         'outputs': {
             'all_strings_csv_bytes': (output_dir / 'all_strings.csv').stat().st_size,
             'suspicious_csv_bytes': (output_dir / 'suspicious.csv').stat().st_size,
+            'missing_ru_csv_bytes': (output_dir / 'missing_ru.csv').stat().st_size,
+            'missing_en_csv_bytes': (output_dir / 'missing_en.csv').stat().st_size,
+            'consistency_en_csv_bytes': (output_dir / 'consistency_en.csv').stat().st_size,
+            'consistency_ru_csv_bytes': (output_dir / 'consistency_ru.csv').stat().st_size,
         },
     }
     (output_dir / 'summary.json').write_text(
@@ -305,7 +385,7 @@ def run_audit(root: Path = ROOT) -> dict:
 def main() -> int:
     summary = run_audit()
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
-    print(f"CSV files: {ROOT / 'audit' / 'all_strings.csv'}; {ROOT / 'audit' / 'suspicious.csv'}")
+    print(f"CSV files: {ROOT / 'audit'}")
     return 0
 
 
