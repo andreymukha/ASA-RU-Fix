@@ -125,18 +125,42 @@ class LocalizationBuildTests(unittest.TestCase):
         expected.update({'Content\t2879543335': 'Седло для Кархародонтозавра',
                          'Content\t2232173803': 'Седло для Берроубака',
                          'Content\t2318685006': 'Парниковая крыша: треугольник и угол',
-                         'Content\t2672943785': 'Стол для доработки',
+                         'Content\t2672943785': 'Стол улучшения чертежей',
                          'Content\t4053904995': 'Усилитель скорости компаньона',
                          'GraphLiteral\t397870435': 'Показать эффекты',
                          'GraphLiteral\t2415568346': 'Точка назначения телепорта'})
-        self.assertEqual(len(edits), 1168)
+        self.assertEqual(len(edits), 1197)
         self.assertEqual({key: edits[key] for key in expected}, expected)
         self.assertNotIn('GraphLiteral\t63761803', edits)
         self.assertFalse(any('RU FIX TEST' in value for value in edits.values()))
         additions = load_edits(Path(__file__).resolve().parents[1] / 'data/additions.json')
-        self.assertEqual(len(additions), 42)
+        self.assertEqual(len(additions), 43)
         self.assertEqual(additions['GraphLiteral\t1863176983'], ', ВЕТЕР:')
         self.assertEqual(additions['GraphLiteral\t3285020872'], 'КАРТЫ ИЗ МОДОВ')
+        self.assertEqual(additions['Content\t1664294528'], 'Седло для Лиоплевродона')
+        for key, value in {
+            'Content\t1085241693': 'Седло для Акрокантозавра',
+            'Content\t1478860490': 'Седло для Мегараптора',
+            'Content\t3497981399': 'Седло для Бизона',
+            'Content\t3885073566': 'Седло для Риниогнаты',
+            'Content\t2672943785': 'Стол улучшения чертежей',
+            'Content\t717958615': 'Стол улучшения предметов',
+            'Content\t382284212': 'Седло для Церберакса',
+            'Content\t1099891526': 'Седло для Гаргантара',
+        }.items():
+            self.assertEqual(edits[key], value)
+        self.assertNotIn('Content\t3983703546', edits)
+
+    def test_ordinary_saddle_name_style_regressions(self):
+        edits = load_edits(Path(__file__).resolve().parents[1] / 'data/corrections.json')
+        for key, value in {
+            'Content\t1478860490': 'Седло для Мегараптора',
+            'Content\t3497981399': 'Седло для Бизона',
+            'Content\t3885073566': 'Седло для Риниогнаты',
+            'Content\t382284212': 'Седло для Церберакса',
+            'Content\t1099891526': 'Седло для Гаргантара',
+        }.items():
+            self.assertEqual(edits[key], value)
 
 
 if __name__ == '__main__':

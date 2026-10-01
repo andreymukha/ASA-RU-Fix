@@ -1,15 +1,15 @@
 # FINAL V1 CANDIDATE — 2026-10-01
 
-Status: **FINAL V1 CANDIDATE**. The latest installed game update has been reconciled; only the user’s manual smoke-test remains before final v1. The user confirmed the preceding stable 1019 corrections work in game. New additions and Engine output require fresh game verification. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
+Status: **FINAL V1 CANDIDATE**. Batch 32 and the fresh-stock saddle audit are now integrated. The user confirmed the preceding stable 1019 corrections work in game; this expanded candidate still requires the user’s manual smoke-test before final v1. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
 
 ## Current prepared artifact
 
-- Corrections: **1168** (1167 previous candidate + 1 migrated addition).
-- ShooterGame additions: **42** (41 from the preserved deferred review + 1 remaining EN-only batch 27 key).
+- Corrections: **1197** (Batch 32 plus two deterministic ordinary-saddle audit corrections).
+- ShooterGame additions: **43** (including the 1 new Batch 32 EN-only saddle title).
 - Engine edits: **21** InputKeys entries, including 20 existing RU keys and 1 EN-only insertion (`InputKeys<TAB>Insert`).
 - Targeted orphan widget entries created: **0**.
-- PAK: `dist/ASA_RU_Fix_P.pak`, **10,794,643 bytes**.
-- SHA-256: `8e653d89c4ad2d53ab3af9e5c86eb6f72b7507fe2ac2df6a137bccb6ba8a69d5`.
+- PAK: `dist/ASA_RU_Fix_P.pak`, **10,794,992 bytes**.
+- SHA-256: `90173b5ed7e9e44bb289089ed7e66e9e267cf1a58e2ceb302f981b1680ecd801`.
 - V11, mount `../../../`, exactly these files:
 
 ```text
@@ -117,6 +117,14 @@ The asset source CRC32 equals current EN and RU hashes for every found Content F
 **No source-hash mismatch was confirmed.** No source-hash sync mechanism or `data/source_hash_sync.json` was added. Production continues to retain every existing RU source hash, with a regression test explicitly proving ordinary corrections do not automatically copy EN hashes. English display of the reported widget instances remains a documented v1 limitation. No unsupported workaround or speculative orphan entry is created. Exact source/hash/value checks after repeated LOCRES parse are in ignored `work/review/source_hash_investigation.json`.
 
 The independent ooz research adapter and compile intermediates were removed after extraction. retoc remains only in ignored `work/tools/` and is not required by production.
+
+## Batch 32 and saddle audit — 2026-10-01
+
+Batch 32 contained 35 reviewed corrections: **27 NEW, 3 REVISIONS, 5 exact duplicates**. Its one EN-only addition, `Content<TAB>1664294528` (`Liopleurodon Saddle`), remains absent from stock RU and is inserted natively from EN order. The resulting data has 1197 corrections, 43 additions, and 21 Engine edits.
+
+The fresh-stock title scan found 157 short `Content` entries ending in `Saddle`. After excluding 40 special or non-creature titles (Tek/platform/lost/styled/submarine/steampunk variants, generic saddle and carriage), 117 ordinary creature saddles remain. Before this batch and audit, 115 followed the standard. Two were normalized: `Content<TAB>382284212` (`Cerberax Saddle`) → «Седло для Церберакса» and `Content<TAB>1099891526` (`Gargantar Saddle`) → «Седло для Гаргантара». All 117 now follow «Седло для <Существа>»; none remain ambiguous. See [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md).
+
+Smithy remains the stock `Content<TAB>3983703546` value «Верстак» and has no correction. Regression samples from the unpacked PAK include Tinkering Desk, Warbench, Acro, Megaraptor, Bison, Rhyniognatha and Liopleurodon saddles. Reopened PAK checks: **1197/1197 corrections, 43/43 additions, 21/21 Engine edits**; repak info/list/unpack and repeated LOCRES parse passed. Unit tests: **63 passed**; standalone guarded build passed with zero forbidden accesses. WEIGHT / Crafting Requirements remain documented noncritical limitations. No CS/Cybers Structures strings were translated.
 
 ## Manual smoke-test plan
 

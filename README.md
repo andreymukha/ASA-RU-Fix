@@ -17,7 +17,7 @@ python build.py
 python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
 ```
 
-Review the **FINAL V1 CANDIDATE** `dist/ASA_RU_Fix_P.pak` and [manual test plan](V1_CANDIDATE.md). Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
+Review the **FINAL V1 CANDIDATE** `dist/ASA_RU_Fix_P.pak` and [manual test plan](V1_CANDIDATE.md). Russian correction conventions are documented in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
 
 Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. After unpacking the PAK, every correction must match its expected value; counts and artifact SHA-256 are recorded in ignored `work/build_validation.json`.
 

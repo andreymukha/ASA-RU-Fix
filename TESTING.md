@@ -12,9 +12,9 @@ python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-**2026-10-01 candidate:** 1168/1168 corrections, 42/42 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **62 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+**2026-10-01 Batch 32 candidate:** 1197/1197 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **63 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
 
-Final cleanup batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Before the game update, corrections increased 1162 -> 1167; additions/Engine JSON remained unchanged by those two batches. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. All ten root review files were archived with SHA-256 verification; no root review CSV/JSON remains. Current artifact and compact smoke-test are recorded in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
+Historical pre-Batch-32 reconciliation: batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Before the game update, corrections increased 1162 -> 1167; additions/Engine JSON remained unchanged by those two batches. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. All ten root review files were archived with SHA-256 verification; no root review CSV/JSON remains. Current artifact and compact smoke-test are recorded in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
 
 After the 2026-10-01 game update, fresh stock counts are ShooterGame EN 39,444 (net +243) and RU 35,598 (net +191); Engine counts are unchanged. One EN-only key became present in RU with a different translation and migrated from additions to corrections. The earlier full key/value snapshots were not retained, so exact stock key-set additions/removals and changed-value totals are unavailable. Deterministic audit: 4,266 missing RU, 7 missing EN, 1,936 suspicious candidates; it performed no semantic review.
 
@@ -92,6 +92,14 @@ The guard runs actual `build.py`, denies paths containing ARKDevkit/UnrealPak/Ep
 Static search covers all seven production code files: build.py, tools/steam.py, tools/locres.py, tools/pakv12.py, tools/oodle.py, tools/bootstrap.py, tools/ooz_bridge.cpp. No DevKit/UnrealPak/Epic lookup/reference remains. Optional oracle code is not imported; generated ooz excludes its proprietary DLL loader.
 
 **12 unit tests pass**, covering plain/single/multiple blocks, 64-bit compact fields, explicit block size, unsupported version/method, encrypted index/payload, missing exact filename, invalid offsets, corrupt/truncated index, corrupt local header/payload, wrong decompressed size, bootstrap cache/hash rejection and Windows process audits.
+
+## Batch 32 production verification
+
+`python build.py` completed from freshly extracted stock resources. The final PAK was inspected with repak `info`, `list` and `unpack`; the unpacked ShooterGame and Engine LOCRES files were parsed again. All **1197 corrections**, **43 additions** and **21 Engine edits** matched exactly. Correction validation reported zero key, placeholder, printf-placeholder or RichText errors. The standalone guarded build passed with zero forbidden accesses; all **63 unit tests** passed.
+
+Batch 32 reconciliation was 27 new corrections, 3 revisions and 5 exact duplicates. The fresh-stock saddle audit found 157 title candidates; 117 ordinary creature saddles remained after excluding 40 special/non-creature variants. 115 were already in the standard; 2 were normalized and all 117 now pass, with 0 ambiguous entries. Smithy (`Content<TAB>3983703546`) remains stock «Верстак» with no correction. WEIGHT / Crafting Requirements remain known noncritical limitations; CS/Cybers Structures text stays out of scope.
+
+Current PAK: `E:\Projects\ARK Survival\ASA-RU-Fix\dist\ASA_RU_Fix_P.pak`, **10,794,992 bytes**, SHA-256 `90173b5ed7e9e44bb289089ed7e66e9e267cf1a58e2ceb302f981b1680ecd801`.
 
 ## Verified artifact
 
