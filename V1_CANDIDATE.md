@@ -1,15 +1,15 @@
 # FINAL V1 CANDIDATE — 2026-10-01
 
-Status: **FINAL V1 CANDIDATE**. Only the user’s manual smoke-test remains before final v1. The user confirmed the preceding stable 1019 corrections work in game. New additions and Engine output require fresh game verification. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
+Status: **FINAL V1 CANDIDATE**. The latest installed game update has been reconciled; only the user’s manual smoke-test remains before final v1. The user confirmed the preceding stable 1019 corrections work in game. New additions and Engine output require fresh game verification. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
 
 ## Current prepared artifact
 
-- Corrections: **1167** (1162 previous candidate + 5 new final cleanup keys).
-- ShooterGame additions: **43** (41 from the preserved deferred review + 2 confirmed batch 27 EN-only keys).
+- Corrections: **1168** (1167 previous candidate + 1 migrated addition).
+- ShooterGame additions: **42** (41 from the preserved deferred review + 1 remaining EN-only batch 27 key).
 - Engine edits: **21** InputKeys entries, including 20 existing RU keys and 1 EN-only insertion (`InputKeys<TAB>Insert`).
 - Targeted orphan widget entries created: **0**.
-- PAK: `dist/ASA_RU_Fix_P.pak`, **10,773,564 bytes**.
-- SHA-256: `9682d73ee053732c6cb778523b1258fd226feb2ed2ec41a7ef032c65267fbd69`.
+- PAK: `dist/ASA_RU_Fix_P.pak`, **10,794,643 bytes**.
+- SHA-256: `8e653d89c4ad2d53ab3af9e5c86eb6f72b7507fe2ac2df6a137bccb6ba8a69d5`.
 - V11, mount `../../../`, exactly these files:
 
 ```text
@@ -17,7 +17,7 @@ Engine/Content/Localization/Engine/ru/Engine.locres
 ShooterGame/Content/Localization/ShooterGame/ru/ShooterGame.locres
 ```
 
-The user authorized both additional batch 27 EN-only keys on 2026-10-01. They are included in additions: `GraphLiteral<TAB>1863176983` (`, WIND:` -> `, ВЕТЕР:`) and `GraphLiteral<TAB>3285020872` (`MOD ARKS` -> `КАРТЫ ИЗ МОДОВ`). The latter translation follows the user's latest revision, overriding the archived CSV's `МОДОВЫЕ КАРТЫ`. All 43 additions remain separate from corrections; no review archive was rewritten.
+The user authorized both additional batch 27 EN-only keys on 2026-10-01. They were included in additions: `GraphLiteral<TAB>1863176983` (`, WIND:` -> `, ВЕТЕР:`) and `GraphLiteral<TAB>3285020872` (`MOD ARKS` -> `КАРТЫ ИЗ МОДОВ`). The latter translation follows the user's latest revision, overriding the archived CSV's `МОДОВЫЕ КАРТЫ`. They were separate from corrections in the pre-update artifact. After the update, `GraphLiteral<TAB>2415568346` moved into corrections, leaving 42 active additions.
 
 ## Historical screenshot import — batches 26–28
 
@@ -31,6 +31,14 @@ Applied explicit priority 28 > 27 > 26 > stable data. Count before each step:
 
 Batch 27 JSON was absent. Its 61 exact `FIX`/`proposed_ru` CSV rows were recovered without semantic changes into `work/review/review_batch_27_corrections_candidate_recovered.json`. Source review files were preserved. Per-key revisions and preflight results are in `work/review/screenshot_import_validation.json`. Ordinary generic candidate import continues to reject different existing values; these revisions were explicitly authorized for this batch sequence.
 
+## Reconciled against the 2026-10-01 installed game update
+
+The production backend extracted all four current stock LOCRES from the installed source PAK (SHA-256 `0c5be928a4c59c66dffa34561daea87e40136618d084390b6919b7bb15c7f027`). New ShooterGame counts: EN **39,444**, RU **35,598**. Previous counts were 39,201 EN / 35,407 RU, for net changes of +243 / +191. Engine counts stayed 48,284 EN / 45,771 RU. The old full key lists and value snapshots were not preserved, so exact set-addition/removal counts and stock changed-value counts cannot be recovered from count deltas alone.
+
+Of 43 previous additions, **42 remain EN-present/RU-missing**. `GraphLiteral<TAB>2415568346` now exists in EN and RU: EN `Teleport Destination`, our value `Точка назначения телепорта`, new stock RU `Пункт назначения телепортации`. It was moved to corrections to preserve our translation. No addition is now redundant with stock RU; no addition key disappeared from EN. All **1167** previous corrections remain in RU with EN present. The correction-to-addition, removed-key and anomaly counts are zero. All 21 Engine keys still exist in EN; 20 have RU entries and `InputKeys<TAB>Insert` remains a valid EN-only insertion.
+
+Stock deltas and classifications: `work/review/update_reconciliation.json`. Fresh dumps replace the prior ignored JSON dumps. `python tools/audit.py` ran mechanically on current stock resources: 4,266 missing RU keys, 7 missing EN keys and 1,936 suspicious candidates; no semantic review was performed.
+
 ## Final cleanup — batches 29–30
 
 Only these two new candidate JSON files were imported; older review files were not merged again. Authorized priority: batch 30 > batch 29 > previous authoritative corrections.
@@ -40,7 +48,7 @@ Only these two new candidate JSON files were imported; older review files were n
 | 29 | 4 | 0 | 1 | 0 |
 | 30 | 1 | 2 | 0 | 0 |
 
-Corrections: **1162 -> 1167**. SHOW BUFFS is an exact duplicate and adds no key. Both Hide Hat identities now equal **Кожаная шапка**: the screenshot confirms an item of clothing, with `hide` meaning leather. Companion Speed Booster equals **Усилитель скорости компаньона**. The additions and Engine data files remain byte-identical to the previous candidate (43 and 21 edits respectively).
+Corrections: **1167 -> 1168** after migrating one now-present addition. Additions: **43 -> 42**. SHOW BUFFS is an exact duplicate and adds no key. Both Hide Hat identities now equal **Кожаная шапка**: the screenshot confirms an item of clothing, with `hide` meaning leather. Companion Speed Booster equals **Усилитель скорости компаньона**. The Engine data file remains byte-identical to the previous candidate (21 edits).
 
 All **10** root review CSV/JSON artifacts were moved without overwrite to ignored `work/review/archive-2026-09-30/`. Each SHA-256 was verified before and after the move; `manifest.json` records filename, hash, size and purpose. No root review CSV/JSON remains; no review artifact is committed. Reports: `work/review/final_cleanup_preflight.json` and `work/review/final_v1_verification.json`.
 
@@ -50,8 +58,8 @@ RU remains the base. Only requested missing keys are copied from current EN, inc
 
 Fresh production build and standalone guarded build passed. After repak info/list/unpack and repeated LOCRES parse:
 
-- **1167/1167 corrections**, **43/43 ShooterGame additions**, **21/21 Engine edits**: MATCH, zero mismatches.
-- ShooterGame: 35,407 stock RU + 43 additions = **35,450 keys**.
+- **1168/1168 corrections**, **42/42 ShooterGame additions**, **21/21 Engine edits**: MATCH, zero mismatches.
+- ShooterGame: 35,598 stock RU + 42 additions = **35,640 keys**.
 - Engine: 45,771 stock RU + Insert = **45,772 keys**.
 - Full dictionaries equal stock RU plus explicit edits; every stock identity hash remains unchanged.
 - Copied EN hashes and native insertion order independently verified after PAK extraction.
@@ -60,7 +68,7 @@ Fresh production build and standalone guarded build passed. After repak info/lis
 - No `RU FIX TEST` in edit values or either LOCRES string table.
 - **62 unit tests PASS**; standalone guard: **0 forbidden accesses**, four cached repak calls.
 
-Reports/logs: `work/build_validation.json`, `work/review/final_v1_verification.json`, `work/review/final_v1_build.log`, `work/review/final_v1_unit_tests.log`, `work/review/final_v1_standalone_build.log`. The earlier `work/review/source_hash_investigation.json` remains the documented widget research evidence; no further widget repair was attempted in final cleanup.
+Reports/logs: `work/build_validation.json`, `work/review/final_v1_verification.json`, `work/review/final_v1_build.log`, `work/review/final_v1_unit_tests.log`, `work/review/final_v1_standalone_build.log`, `work/review/update_reconciliation.json`, `work/review/update_unit_tests.log`, `work/review/update_standalone_build.log`. The earlier `work/review/source_hash_investigation.json` remains the documented widget research evidence; no further widget repair was attempted in final cleanup.
 
 ## Adobe additions smoke test
 

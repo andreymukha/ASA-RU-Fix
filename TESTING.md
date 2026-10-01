@@ -1,4 +1,4 @@
-# Standalone verification — 2026-09-30
+# Standalone verification — 2026-10-01
 
 ## FINAL V1 CANDIDATE
 
@@ -12,9 +12,11 @@ python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-**2026-10-01 candidate:** 1167/1167 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **62 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+**2026-10-01 candidate:** 1168/1168 corrections, 42/42 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **62 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
 
-Final cleanup batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Corrections increase 1162 -> 1167; additions/Engine JSON bytes remain unchanged. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. All ten root review files were archived with SHA-256 verification; no root review CSV/JSON remains. Current artifact and compact smoke-test are recorded in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
+Final cleanup batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Before the game update, corrections increased 1162 -> 1167; additions/Engine JSON remained unchanged by those two batches. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. All ten root review files were archived with SHA-256 verification; no root review CSV/JSON remains. Current artifact and compact smoke-test are recorded in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
+
+After the 2026-10-01 game update, fresh stock counts are ShooterGame EN 39,444 (net +243) and RU 35,598 (net +191); Engine counts are unchanged. One EN-only key became present in RU with a different translation and migrated from additions to corrections. The earlier full key/value snapshots were not retained, so exact stock key-set additions/removals and changed-value totals are unavailable. Deterministic audit: 4,266 missing RU, 7 missing EN, 1,936 suspicious candidates; it performed no semantic review.
 
 Tests cover requested EN-only insertion in native position, EN namespace/key/source hash copying, namespace positioning, incompatible order rejection, corrections coexisting with additions, Engine existing/missing keys, both PAK entries, unexpected PAK files, every post-unpack edit and the screenshot regressions. Widget orphan creation is not implemented because no orphan identity was confirmed. All current placeholder/RichText preflights and reopened resource verification must pass. Historical results below refer to their earlier artifacts.
 

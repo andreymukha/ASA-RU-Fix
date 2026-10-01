@@ -127,13 +127,14 @@ class LocalizationBuildTests(unittest.TestCase):
                          'Content\t2318685006': 'Парниковая крыша: треугольник и угол',
                          'Content\t2672943785': 'Стол для доработки',
                          'Content\t4053904995': 'Усилитель скорости компаньона',
-                         'GraphLiteral\t397870435': 'Показать эффекты'})
-        self.assertEqual(len(edits), 1167)
+                         'GraphLiteral\t397870435': 'Показать эффекты',
+                         'GraphLiteral\t2415568346': 'Точка назначения телепорта'})
+        self.assertEqual(len(edits), 1168)
         self.assertEqual({key: edits[key] for key in expected}, expected)
         self.assertNotIn('GraphLiteral\t63761803', edits)
         self.assertFalse(any('RU FIX TEST' in value for value in edits.values()))
         additions = load_edits(Path(__file__).resolve().parents[1] / 'data/additions.json')
-        self.assertEqual(len(additions), 43)
+        self.assertEqual(len(additions), 42)
         self.assertEqual(additions['GraphLiteral\t1863176983'], ', ВЕТЕР:')
         self.assertEqual(additions['GraphLiteral\t3285020872'], 'КАРТЫ ИЗ МОДОВ')
 
