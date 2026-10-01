@@ -1,8 +1,8 @@
 # Standalone verification — 2026-10-01
 
-## FINAL V1 CANDIDATE
+## FINAL V1
 
-See [V1_CANDIDATE.md](V1_CANDIDATE.md) for the current artifact, counts, targeted widget evidence and manual test plan. The stable 1019-correction version was reported by the user as working in the real game. The new additions/Engine candidate requires a new manual game test; the agent does not launch ARK or install the patch.
+See [V1_CANDIDATE.md](V1_CANDIDATE.md) for the current artifact, counts, targeted widget evidence and manual test plan. The stable 1019-correction version was reported by the user as working in the real game. The agent does not launch ARK or install the patch. Optional in-game confirmation is documented separately.
 
 Production commands:
 
@@ -12,9 +12,9 @@ python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-**2026-10-01 Batch 32 candidate:** 1197/1197 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **63 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+**FINAL V1, 2026-10-02:** 1200/1200 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **63 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
 
-Historical pre-Batch-32 reconciliation: batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Before the game update, corrections increased 1162 -> 1167; additions/Engine JSON remained unchanged by those two batches. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. All ten root review files were archived with SHA-256 verification; no root review CSV/JSON remains. Current artifact and compact smoke-test are recorded in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
+Historical pre-Batch-32 reconciliation: batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Before the game update, corrections increased 1162 -> 1167; additions/Engine JSON remained unchanged by those two batches. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. The ten review files present in that earlier cleanup were archived with SHA-256 verification. Later Batch 32/33 review inputs were archived in the same ignored review archive; no root review CSV/JSON remains. The current artifact is documented in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
 
 After the 2026-10-01 game update, fresh stock counts are ShooterGame EN 39,444 (net +243) and RU 35,598 (net +191); Engine counts are unchanged. One EN-only key became present in RU with a different translation and migrated from additions to corrections. The earlier full key/value snapshots were not retained, so exact stock key-set additions/removals and changed-value totals are unavailable. Deterministic audit: 4,266 missing RU, 7 missing EN, 1,936 suspicious candidates; it performed no semantic review.
 
@@ -99,7 +99,7 @@ Static search covers all seven production code files: build.py, tools/steam.py, 
 
 Batch 32 reconciliation was 27 new corrections, 3 revisions and 5 exact duplicates. The fresh-stock saddle audit found 157 title candidates; 117 ordinary creature saddles remained after excluding 40 special/non-creature variants. 115 were already in the standard; 2 were normalized and all 117 now pass, with 0 ambiguous entries. Smithy (`Content<TAB>3983703546`) remains stock «Верстак» with no correction. WEIGHT / Crafting Requirements remain known noncritical limitations; CS/Cybers Structures text stays out of scope.
 
-Current PAK: `E:\Projects\ARK Survival\ASA-RU-Fix\dist\ASA_RU_Fix_P.pak`, **10,794,992 bytes**, SHA-256 `90173b5ed7e9e44bb289089ed7e66e9e267cf1a58e2ceb302f981b1680ecd801`.
+Current PAK: `E:\Projects\ARK Survival\ASA-RU-Fix\dist\ASA_RU_Fix_P.pak`, **10,795,036 bytes**, SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`. Batch 33: `FEET` → «Ступни» for all three requested keys; existing LEGS corrections remain unchanged (the plain `Legs` key is «Ноги»).
 
 ## Verified artifact
 

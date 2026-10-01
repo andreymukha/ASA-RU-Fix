@@ -129,7 +129,7 @@ class LocalizationBuildTests(unittest.TestCase):
                          'Content\t4053904995': 'Усилитель скорости компаньона',
                          'GraphLiteral\t397870435': 'Показать эффекты',
                          'GraphLiteral\t2415568346': 'Точка назначения телепорта'})
-        self.assertEqual(len(edits), 1197)
+        self.assertEqual(len(edits), 1200)
         self.assertEqual({key: edits[key] for key in expected}, expected)
         self.assertNotIn('GraphLiteral\t63761803', edits)
         self.assertFalse(any('RU FIX TEST' in value for value in edits.values()))
@@ -150,6 +150,9 @@ class LocalizationBuildTests(unittest.TestCase):
         }.items():
             self.assertEqual(edits[key], value)
         self.assertNotIn('Content\t3983703546', edits)
+        self.assertEqual(edits['Content\t478560471'], 'СТУПНИ')
+        self.assertEqual(edits['Content\t1576228423'], 'Ступни')
+        self.assertEqual(edits['GraphLiteral\t1576228423'], 'Ступни')
 
     def test_ordinary_saddle_name_style_regressions(self):
         edits = load_edits(Path(__file__).resolve().parents[1] / 'data/corrections.json')

@@ -1,15 +1,15 @@
-# FINAL V1 CANDIDATE — 2026-10-01
+# FINAL V1 — 2026-10-02
 
-Status: **FINAL V1 CANDIDATE**. Batch 32 and the fresh-stock saddle audit are now integrated. The user confirmed the preceding stable 1019 corrections work in game; this expanded candidate still requires the user’s manual smoke-test before final v1. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
+Status: **FINAL V1**. Batches 32 and 33, the fresh-stock saddle audit and slot corrections are integrated. The user confirmed the earlier Back correction in game. This final artifact passed production build, full LOCRES/PAK validation and the complete test suite. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.
 
 ## Current prepared artifact
 
-- Corrections: **1197** (Batch 32 plus two deterministic ordinary-saddle audit corrections).
+- Corrections: **1200** (including Batch 33 equipment slot corrections).
 - ShooterGame additions: **43** (including the 1 new Batch 32 EN-only saddle title).
 - Engine edits: **21** InputKeys entries, including 20 existing RU keys and 1 EN-only insertion (`InputKeys<TAB>Insert`).
 - Targeted orphan widget entries created: **0**.
-- PAK: `dist/ASA_RU_Fix_P.pak`, **10,794,992 bytes**.
-- SHA-256: `90173b5ed7e9e44bb289089ed7e66e9e267cf1a58e2ceb302f981b1680ecd801`.
+- PAK: `dist/ASA_RU_Fix_P.pak`, **10,795,036 bytes**.
+- SHA-256: `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`.
 - V11, mount `../../../`, exactly these files:
 
 ```text
@@ -51,6 +51,10 @@ Only these two new candidate JSON files were imported; older review files were n
 Corrections: **1167 -> 1168** after migrating one now-present addition. Additions: **43 -> 42**. SHOW BUFFS is an exact duplicate and adds no key. Both Hide Hat identities now equal **Кожаная шапка**: the screenshot confirms an item of clothing, with `hide` meaning leather. Companion Speed Booster equals **Усилитель скорости компаньона**. The Engine data file remains byte-identical to the previous candidate (21 edits).
 
 All **10** root review CSV/JSON artifacts were moved without overwrite to ignored `work/review/archive-2026-09-30/`. Each SHA-256 was verified before and after the move; `manifest.json` records filename, hash, size and purpose. No root review CSV/JSON remains; no review artifact is committed. Reports: `work/review/final_cleanup_preflight.json` and `work/review/final_v1_verification.json`.
+
+## Earlier production snapshot — 2026-10-01 (superseded by FINAL V1 below)
+
+The following 2026-10-01 figures describe the previous snapshot only. Current FINAL V1 totals and validation are recorded in the Batch 33 section below.
 
 ## Missing RU mechanism and validation
 
@@ -126,6 +130,14 @@ The fresh-stock title scan found 157 short `Content` entries ending in `Saddle`.
 
 Smithy remains the stock `Content<TAB>3983703546` value «Верстак» and has no correction. Regression samples from the unpacked PAK include Tinkering Desk, Warbench, Acro, Megaraptor, Bison, Rhyniognatha and Liopleurodon saddles. Reopened PAK checks: **1197/1197 corrections, 43/43 additions, 21/21 Engine edits**; repak info/list/unpack and repeated LOCRES parse passed. Unit tests: **63 passed**; standalone guarded build passed with zero forbidden accesses. WEIGHT / Crafting Requirements remain documented noncritical limitations. No CS/Cybers Structures strings were translated.
 
+## Batch 33 and FINAL v1 verification — 2026-10-02
+
+Batch 33 added only three equipment slot corrections: `Content<TAB>478560471` (`FEET`) → «СТУПНИ», `Content<TAB>1576228423` (`Feet`) → «Ступни», and `GraphLiteral<TAB>1576228423` (`Feet`) → «Ступни». Existing LEGS corrections were not changed. The plain `Legs` entry remains «Ноги»; the two existing uppercase `LEGS` corrections retain their previous «НОГИ» casing.
+
+Final counts: **1200 corrections, 43 additions, 21 Engine edits**. After repak info/list/unpack and a repeated LOCRES parse, all edits matched: **1200/1200, 43/43, 21/21**. Full correction preflight reported zero key, placeholder, printf-placeholder and RichText errors. The complete suite passed: **63 tests**. The final artifact is `dist/ASA_RU_Fix_P.pak`, 10,795,036 bytes, SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`.
+
+Known limitations remain: WEIGHT / Crafting Requirements may still display in English despite matching LOCRES data; CS / Cybers Structures text belongs to third-party mods and is outside the base translation. No broad translation or new audit was performed for Batch 33.
+
 ## Manual smoke-test plan
 
 1. Settings: Sound / Graphics / UI / Camera.
@@ -136,4 +148,4 @@ Smithy remains the stock `Content<TAB>3983703546` value «Верстак» and h
 6. Companion Speed Booster: **Усилитель скорости компаньона**.
 7. The original **Назад** correction remains active.
 
-If ordinary corrections disappear after additions, record FAIL: the rebuilt LOCRES may have been rejected. WEIGHT / Crafting Requirements are accepted, documented v1 limitations and do not count as a v1 smoke-test failure. Third-party CS / Cybers Structures and other mod text are outside this project’s scope. The user runs the smoke-test and decides whether to release final v1.
+This checklist is available for optional in-game confirmation by the user. It was not run by the agent. WEIGHT / Crafting Requirements are documented noncritical v1 limitations. Third-party CS / Cybers Structures and other mod text are outside this project’s scope.
