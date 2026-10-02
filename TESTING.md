@@ -12,7 +12,11 @@ python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-**FINAL V1, 2026-10-02:** 1200/1200 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **63 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
+## Hidden update launcher
+
+Four Windows integration tests exercise `Обновить перевод.vbs` and `update.ps1` from a temporary project root and a different current directory. They cover a successful build/install sequence, build exit code propagation with installation skipped and the test PAK left unchanged, installation failure logging, output capture, log overwrite, hidden PowerShell invocation and the completion/error message text. They use stub build/install scripts and do not launch ARK or modify the installed game.
+
+**FINAL V1, 2026-10-02:** 1200/1200 corrections, 43/43 ShooterGame additions and 21/21 Engine edits match after PAK extraction. **67 tests pass**; the guarded build reports zero forbidden accesses and four cached repak calls. WEIGHT/Crafting Requirements EN/RU/asset source hashes match, so source-hash sync is not implemented. The explicit regression test ensures ordinary corrections retain stock source hashes.
 
 Historical pre-Batch-32 reconciliation: batch 29: 4 NEW, 0 REVISION, 1 EXACT_DUPLICATE; batch 30: 1 NEW, 2 REVISION, 0 EXACT_DUPLICATE. Before the game update, corrections increased 1162 -> 1167; additions/Engine JSON remained unchanged by those two batches. Reopened PAK samples confirm Back, Carcharo Saddle, Burrowbuck Saddle, Greenhouse Triangle Roof & Corner, Tinkering Desk, both Hide Hat identities, Companion Speed Booster, Adobe Gateway and three Engine InputKeys. Placeholder/RichText issues: zero. repak info/list/unpack: PASS. The ten review files present in that earlier cleanup were archived with SHA-256 verification. Later Batch 32/33 review inputs were archived in the same ignored review archive; no root review CSV/JSON remains. The current artifact is documented in V1_CANDIDATE.md; WEIGHT/Crafting Requirements are accepted v1 limitations.
 

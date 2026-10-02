@@ -134,7 +134,7 @@ Smithy remains the stock `Content<TAB>3983703546` value «Верстак» and h
 
 Batch 33 added only three equipment slot corrections: `Content<TAB>478560471` (`FEET`) → «СТУПНИ», `Content<TAB>1576228423` (`Feet`) → «Ступни», and `GraphLiteral<TAB>1576228423` (`Feet`) → «Ступни». Existing LEGS corrections were not changed. The plain `Legs` entry remains «Ноги»; the two existing uppercase `LEGS` corrections retain their previous «НОГИ» casing.
 
-Final counts: **1200 corrections, 43 additions, 21 Engine edits**. After repak info/list/unpack and a repeated LOCRES parse, all edits matched: **1200/1200, 43/43, 21/21**. Full correction preflight reported zero key, placeholder, printf-placeholder and RichText errors. The complete suite passed: **63 tests**. The final artifact is `dist/ASA_RU_Fix_P.pak`, 10,795,036 bytes, SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`.
+Final counts: **1200 corrections, 43 additions, 21 Engine edits**. After repak info/list/unpack and a repeated LOCRES parse, all edits matched: **1200/1200, 43/43, 21/21**. Full correction preflight reported zero key, placeholder, printf-placeholder and RichText errors. The complete suite passed: **67 tests**. The final artifact is `dist/ASA_RU_Fix_P.pak`, 10,795,036 bytes, SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`.
 
 Known limitations remain: WEIGHT / Crafting Requirements may still display in English despite matching LOCRES data; CS / Cybers Structures text belongs to third-party mods and is outside the base translation. No broad translation or new audit was performed for Batch 33.
 

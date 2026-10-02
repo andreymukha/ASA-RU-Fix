@@ -17,7 +17,11 @@ python build.py
 python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
 ```
 
-Review the **FINAL V1** artifact `dist/ASA_RU_Fix_P.pak` and [verification notes](V1_CANDIDATE.md). Russian correction conventions are documented in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). Build never installs it. After an ARK update, run `python build.py` again: it freshly extracts the official resources without reusing a stale translation dump.
+Review the **FINAL V1** artifact `dist/ASA_RU_Fix_P.pak` and [verification notes](V1_CANDIDATE.md). Russian correction conventions are documented in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). `python build.py` only creates the patch; use the launcher below to rebuild and install it after a game update.
+
+## Обновление после патча ARK
+
+После обновления ARK дважды щёлкните **«Обновить перевод.vbs»** в корне проекта. Скрипт запускает сборку и `install.ps1` без видимого окна консоли; полный вывод сохраняется в `work/update.log`. При ошибке сборки установка не запускается, а подробности остаются в логе.
 
 Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. After unpacking the PAK, every correction must match its expected value; counts and artifact SHA-256 are recorded in ignored `work/build_validation.json`.
 
@@ -33,7 +37,7 @@ Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text.
 
 Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stores explicitly reviewed EN-only ShooterGame keys. Build copies their EN namespace/key/source hashes and inserts them in native EN order into the stock RU base, then rebuilds string tables/refcounts. Keys already present in RU, unknown EN keys or incompatible stock order fail explicitly. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
-The current **FINAL V1** contains 1200 corrections, 43 ShooterGame additions and 21 Engine edits. Batch 33 distinguishes equipment slots: LEGS remains «Ноги» and FEET is «Ступни». The artifact passed production build, repak info/list/unpack, repeated LOCRES validation and all 63 tests. See [V1_CANDIDATE.md](V1_CANDIDATE.md) for artifact details, verification and known limitations.
+The current **FINAL V1** contains 1200 corrections, 43 ShooterGame additions and 21 Engine edits. Batch 33 distinguishes equipment slots: LEGS remains «Ноги» and FEET is «Ступни». The artifact passed production build, repak info/list/unpack, repeated LOCRES validation and all 67 tests. See [V1_CANDIDATE.md](V1_CANDIDATE.md) for artifact details, verification and known limitations.
 
 `data/engine_ru.json` contains only confirmed `InputKeys` identities. Engine EN/RU resources are freshly extracted from the same installed V12 PAK. Existing RU keys are corrected; an explicitly requested EN-only key is inserted by the same safe merge. Production packs both Engine RU and ShooterGame RU LOCRES, then reopens both and verifies every translation and byte. `Tilde` has no confirmed InputKeys entry in the current resources and is not guessed.
 
