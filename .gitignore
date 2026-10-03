@@ -16,3 +16,6 @@ audit/
 *.so
 *.ucas
 *.utoc
+client/**/bin/
+client/**/obj/
+client/**/TestResults/
