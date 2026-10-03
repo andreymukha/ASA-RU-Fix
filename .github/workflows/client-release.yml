@@ -1,0 +1,97 @@
+name: Release Windows updater
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия updater из client/Directory.Build.props, например 1.0.0"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+# Share the server writer's queue: neither writer may replace the other's files.
+concurrency:
+  group: asa-ru-fix-live-update
+  cancel-in-progress: false
+
+jobs:
+  client-release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: client
+    env:
+      CLIENT_VERSION: ${{ inputs.version }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: "false"
+      DOTNET_NOLOGO: "true"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Require the production source branch
+        working-directory: .
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/master') { throw 'Client releases must run from master.' }
+
+      - name: Checkout source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12 x64
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          architecture: x64
+
+      - name: Validate requested version before building
+        working-directory: .
+        run: python -m tools.client_release validate --project client/Directory.Build.props --version $env:CLIENT_VERSION
+
+      - name: Set up pinned .NET 10 LTS SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: "10.0.401"
+          global-json-file: client/global.json
+          architecture: x64
+
+      - name: Build process fixture
+        run: dotnet build tests/ChildProbe/ChildProbe.csproj --configuration Release
+
+      - name: Run client fixture tests
+        env:
+          ASA_RU_FIX_CHILD_PROBE: ${{ github.workspace }}/client/tests/ChildProbe/bin/Release/net10.0/ChildProbe.exe
+        run: dotnet test tests/AsaRuFix.Tests/AsaRuFix.Tests.csproj --configuration Release --logger "trx;LogFileName=client-tests.trx" --results-directory ../work/client-test-results
+
+      - name: Run server and client release regression tests
+        working-directory: .
+        run: python -m unittest discover -s tests
+
+      - name: Publish the single unsigned user EXE
+        run: dotnet publish src/AsaRuFix.App/AsaRuFix.App.csproj --configuration Release --runtime win-x64 --self-contained true --output ../work/client-publish -p:PublishSingleFile=true -p:PublishTrimmed=false -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:RuntimeFrameworkVersion=10.0.12 -p:ContinuousIntegrationBuild=true -p:SourceRevisionId=$env:GITHUB_SHA
+
+      - name: Validate binary and create deterministic release metadata
+        working-directory: .
+        run: python -m tools.client_build_report --project client/Directory.Build.props --version $env:CLIENT_VERSION --publish-dir work/client-publish --output-dir work/client-metadata --commit $env:GITHUB_SHA --repository $env:GITHUB_REPOSITORY
+
+      - name: Publish immutable updater release and verified client channel
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m tools.client_release publish --project client/Directory.Build.props --version $env:CLIENT_VERSION --publish-dir work/client-publish --metadata-dir work/client-metadata --commit $env:GITHUB_SHA --repository $env:GITHUB_REPOSITORY
+
+      - name: Preserve release metadata and TRX
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asa-ru-fix-client-release-report
+          path: |
+            work/client-metadata/*.json
+            work/client-metadata/SHA256SUMS.txt
+            work/client-test-results/*.trx
+          if-no-files-found: warn
+          retention-days: 7

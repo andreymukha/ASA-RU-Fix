@@ -1,0 +1,80 @@
+name: Build Windows updater
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  client-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: client
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: "false"
+      DOTNET_NOLOGO: "true"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pinned .NET 10 LTS SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: "10.0.401"
+          global-json-file: client/global.json
+          architecture: x64
+
+      - name: Set up Python 3.12 x64
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          architecture: x64
+
+      - name: Build process fixture
+        run: dotnet build tests/ChildProbe/ChildProbe.csproj --configuration Release
+
+      - name: Run client fixture tests
+        env:
+          ASA_RU_FIX_CHILD_PROBE: ${{ github.workspace }}/client/tests/ChildProbe/bin/Release/net10.0/ChildProbe.exe
+        run: dotnet test tests/AsaRuFix.Tests/AsaRuFix.Tests.csproj --configuration Release --logger "trx;LogFileName=client-tests.trx" --results-directory ../work/client-test-results
+
+      - name: Run server and client release regression tests
+        working-directory: .
+        run: python -m unittest discover -s tests
+
+      - name: Publish the single unsigned user EXE
+        run: dotnet publish src/AsaRuFix.App/AsaRuFix.App.csproj --configuration Release --runtime win-x64 --self-contained true --output ../work/client-publish -p:PublishSingleFile=true -p:PublishTrimmed=false -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:RuntimeFrameworkVersion=10.0.12 -p:ContinuousIntegrationBuild=true -p:SourceRevisionId=$env:GITHUB_SHA
+
+      - name: Validate one-file output and record size and SHA-256
+        working-directory: .
+        run: python -m tools.client_build_report --project client/Directory.Build.props --publish-dir work/client-publish --output-dir work/client-metadata --commit $env:GITHUB_SHA --repository $env:GITHUB_REPOSITORY
+
+      - name: Upload the user EXE
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asa-ru-fix-client-win-x64
+          path: work/client-publish/ASA-RU-Fix.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Preserve build metadata and TRX
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asa-ru-fix-client-build-report
+          path: |
+            work/client-metadata/*.json
+            work/client-metadata/SHA256SUMS.txt
+            work/client-test-results/*.trx
+          if-no-files-found: warn
+          retention-days: 7
