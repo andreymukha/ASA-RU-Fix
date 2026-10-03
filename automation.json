@@ -1,19 +1,18 @@
 {
   "last_attempt": {
-    "at": "2026-10-03T04:24:00.557594Z",
+    "at": "2026-10-03T04:26:04.050668Z",
     "attempt_count": 1,
-    "build_fingerprint": "1203008ec18fa39924ac6fa01f370b0b759f55c6e6ed9ecfc653019dc619cf85",
-    "failure_count": 1,
+    "build_fingerprint": "72853b3027d0fbcb50ae0a997dc78c90c766cbb94c96b347971bce3823c242be",
+    "failure_count": 0,
     "manifest_id": "3251368963427721326",
-    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', '-m', 'tools.bootstrap')",
-    "run_id": "37096369421",
-    "status": "failed"
+    "run_id": "37096442392",
+    "status": "success"
   },
   "last_successful": {
-    "at": "2026-10-03T04:21:27.969920Z",
-    "build_fingerprint": "59fff5c46ccbdff7626018aefa26c5414a9a18b9d0e3ce91ba363daf152f35e7",
+    "at": "2026-10-03T04:26:04.050668Z",
+    "build_fingerprint": "72853b3027d0fbcb50ae0a997dc78c90c766cbb94c96b347971bce3823c242be",
     "manifest_id": "3251368963427721326",
-    "run_id": "37096179668"
+    "run_id": "37096442392"
   },
   "latest_release": {
     "sha256": "914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b",
