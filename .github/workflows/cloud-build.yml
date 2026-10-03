@@ -29,7 +29,7 @@ jobs:
         run: python build.py --source steam --manifest 3251368963427721326
 
       - name: Run full test suite and write cloud report
-        run: python tools/cloud_report.py
+        run: python -m tools.cloud_report
 
       - name: Prepare exact artifact contents
         shell: pwsh
