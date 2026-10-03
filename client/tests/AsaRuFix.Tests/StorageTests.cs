@@ -1,5 +1,6 @@
 using AsaRuFix.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Globalization;
 
 namespace AsaRuFix.Tests;
 
@@ -45,6 +46,30 @@ public class StorageTests
             store.Save(new() { UpdaterVersion = "1.0.1", OriginalLaunchOptions = " -high " });
             File.WriteAllText(store.Paths.Config, "{broken again");
             Assert.AreEqual(" -high ", store.Load()!.OriginalLaunchOptions);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [TestMethod]
+    public void LoggerUsesLocalIso8601TimestampAndPreservesEntryContent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        try
+        {
+            var logger = new LocalLogger(new AppPaths(root));
+            var before = DateTimeOffset.UtcNow;
+            logger.Write("translation-Current", "1.0.0");
+            var after = DateTimeOffset.UtcNow;
+            var entry = File.ReadAllText(Path.Combine(root, "logs", "updater.log"));
+            var separator = entry.IndexOf(' ');
+            Assert.IsTrue(separator > 0);
+            var timestampText = entry[..separator];
+            Assert.IsTrue(DateTimeOffset.TryParseExact(timestampText, "O", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var timestamp));
+            Assert.AreEqual(TimeZoneInfo.Local.GetUtcOffset(timestamp), timestamp.Offset);
+            Assert.AreEqual(timestamp.ToString("O", CultureInfo.InvariantCulture), timestampText);
+            Assert.IsTrue(timestamp >= before && timestamp <= after);
+            Assert.AreEqual(" translation-Current 1.0.0\n", entry[separator..]);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }

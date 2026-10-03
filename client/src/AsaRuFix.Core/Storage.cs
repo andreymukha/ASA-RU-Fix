@@ -110,7 +110,7 @@ public sealed class LocalLogger(AppPaths paths, long maxBytes = 256 * 1024)
                         if (File.Exists(previous)) File.Move(previous, file + "." + i, true);
                     }
                 }
-                File.AppendAllText(file, $"{DateTimeOffset.UtcNow:O} {kind} {detail[..Math.Min(detail.Length, 1000)]}\n");
+                File.AppendAllText(file, $"{DateTimeOffset.Now:O} {kind} {detail[..Math.Min(detail.Length, 1000)]}\n");
             }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
