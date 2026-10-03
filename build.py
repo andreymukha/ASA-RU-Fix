@@ -183,6 +183,9 @@ def main() -> int:
     source_pak, source_report = resolve_source(args, parser)
     source_report['manifest'] = args.manifest
     source_report['pak_sha256'] = file_sha256(source_pak)
+    (ROOT / 'work/build_progress.json').write_text(json.dumps({
+        'profile': args.profile, 'source': source_report,
+    }, indent=2) + '\n', encoding='utf-8')
     reader = PakReader(source_pak)
 
     work = ROOT / "work"
