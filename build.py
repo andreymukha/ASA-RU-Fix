@@ -15,6 +15,14 @@ from tools.locres import LocresError, load_edits, parse, serialize, insert_missi
 from tools.corrections import validate_corrections, verify_applied
 from tools.steam import find_game
 from tools.pakv12 import PakReader
+from tools.server_depot import (
+    EXPECTED_PAK_SHA256,
+    EXPECTED_PAK_SIZE,
+    PINNED_MANIFEST,
+    PINNED_STOCK,
+    download_server_pak,
+    validate_stock_resources,
+)
 
 ROOT = Path(__file__).resolve().parent
 PAK_REL = Path("ShooterGame/Content/Paks/pakchunk0-Windows.pak")
@@ -111,22 +119,57 @@ def verify_package(repak, dist, verify_root, resources, edits):
             'list_info_unpack': 'PASS'}
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--game-path", type=Path, help="Explicit ASA installation directory")
-    parser.add_argument("--repak", type=Path, help="repak v0.2.3 executable")
-    args = parser.parse_args()
+def resolve_source(args: argparse.Namespace, parser: argparse.ArgumentParser) -> tuple[Path, dict]:
+    if args.source == 'steam':
+        depotdownloader = ROOT / 'work' / 'tools' / 'depotdownloader' / 'DepotDownloader.exe'
+        try:
+            result = download_server_pak(depotdownloader, ROOT / 'work' / 'server-depot', manifest=args.manifest)
+        except RuntimeError as exc:
+            parser.error(str(exc))
+        return result['path'], {
+            'kind': 'steam-dedicated-server', 'app_id': result['app_id'],
+            'depot_id': result['depot_id'], 'manifest': result['manifest'],
+            'downloaded_bytes': result['downloaded_bytes'], 'pak_size': result['pak_size'],
+        }
+    if args.source == 'server-pak':
+        if not args.server_pak:
+            parser.error('--source server-pak requires --server-pak')
+        source_pak = args.server_pak.expanduser().resolve()
+        if not source_pak.is_file():
+            parser.error(f'server PAK not found: {source_pak}')
+        return source_pak, {'kind': 'server-pak-file', 'pak_size': source_pak.stat().st_size}
+    if args.server_pak:
+        parser.error('--server-pak is only valid with --source server-pak')
     game = resolve_game(args.game_path, parser)
-    repak = resolve_repak(args.repak, parser)
     source_pak = game / PAK_REL
     if not source_pak.is_file():
-        parser.error(f"required PAK not found: {source_pak}")
+        parser.error(f'required PAK not found: {source_pak}')
+    return source_pak, {'kind': 'installed-game', 'game_path': str(game), 'pak_size': source_pak.stat().st_size}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source', choices=('steam', 'server-pak', 'installed-game'), default='steam',
+                        help='Input source (default: pinned Steam Dedicated Server depot)')
+    parser.add_argument('--manifest', default=PINNED_MANIFEST, help='Pinned server depot manifest ID')
+    parser.add_argument('--server-pak', type=Path, help='Local server PAK for deterministic developer verification')
+    parser.add_argument("--game-path", type=Path, help="Explicit ASA installation directory (developer source)")
+    parser.add_argument("--repak", type=Path, help="repak v0.2.3 executable")
+    parser.add_argument('--output', type=Path, help='Output PAK path (defaults to dist/ASA_RU_Fix_P.pak)')
+    args = parser.parse_args()
+    repak = resolve_repak(args.repak, parser)
+    source_pak, source_report = resolve_source(args, parser)
     reader = PakReader(source_pak)
 
     work = ROOT / "work"
     extract_root = work / "source"
-    print(f"Game: {game}\nSource PAK V12: {source_pak}\nExtractor: tools.pakv12 + cached ooz DLL\nrepak writer: {repak}")
+    print(f"Source: {source_report['kind']}\nSource PAK V12: {source_pak}\n"
+          f"Extractor: tools.pakv12 + cached ooz DLL\nrepak writer: {repak}")
     resources, all_edits, reports = {}, {}, {}
+    stock_bytes = {}
+    for name, spec in PINNED_STOCK.items():
+        stock_bytes[name] = reader.extract(spec.relative_path)
+    stock_validation = validate_stock_resources(stock_bytes)
     for name, internal, correction_file, addition_file in (
         ('ShooterGame', INTERNAL, 'corrections.json', 'additions.json'),
         ('Engine', ENGINE_INTERNAL, 'engine_ru.json', None),
@@ -134,8 +177,9 @@ def main() -> int:
         stock = {}
         stock_hashes = {}
         for language in ('en', 'ru'):
-            relative = internal.replace('/ru/', f'/{language}/')
-            raw = reader.extract('../../../' + relative)
+            input_name = f'{name} {language.upper()}'
+            relative = PINNED_STOCK[input_name].relative_path.removeprefix('../../../')
+            raw = stock_bytes[input_name]
             path = extract_root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(raw)
@@ -175,18 +219,56 @@ def main() -> int:
         staged = stage_root / internal
         staged.parent.mkdir(parents=True, exist_ok=True)
         staged.write_bytes(built)
-    dist = ROOT / 'dist' / 'ASA_RU_Fix_P.pak'
+    dist = (args.output.expanduser().resolve() if args.output else ROOT / 'dist' / 'ASA_RU_Fix_P.pak')
+    if dist == source_pak.resolve():
+        raise RuntimeError('output PAK path must not overwrite the source PAK')
     dist.parent.mkdir(parents=True, exist_ok=True)
     dist.unlink(missing_ok=True)
     run_repak(repak, 'pack', '--version', 'V11', '--mount-point', '../../../', '--quiet', str(stage_root), str(dist))
     package = verify_package(repak, dist, work / 'pak_verify', resources, all_edits)
+    pak_size = dist.stat().st_size
+    pak_sha256 = hashlib.sha256(dist.read_bytes()).hexdigest()
+    deterministic_match = pak_size == EXPECTED_PAK_SIZE and pak_sha256 == EXPECTED_PAK_SHA256
+    if not deterministic_match:
+        raise RuntimeError(
+            f'Pinned production PAK mismatch: expected {EXPECTED_PAK_SIZE} bytes / {EXPECTED_PAK_SHA256}, '
+            f'got {pak_size} bytes / {pak_sha256}'
+        )
+    engine_edit_count = reports['Engine']['corrections_verification']['expected'] + reports['Engine']['additions_verification']['expected']
+    counts = {
+        'corrections': reports['ShooterGame']['corrections_verification']['expected'],
+        'additions': reports['ShooterGame']['additions_verification']['expected'],
+        'engine_edits': engine_edit_count,
+    }
+    if counts != {'corrections': 1200, 'additions': 43, 'engine_edits': 21}:
+        raise RuntimeError(f'unexpected production translation counts: {counts}')
+    preflights = [reports[resource][kind] for resource in ('ShooterGame', 'Engine')
+                  for kind in ('corrections_preflight', 'additions_preflight')]
+    quality_validation = {
+        'status': 'PASS' if all(item['issues'] == 0 for item in preflights) else 'FAIL',
+        'entries_checked': sum(item['checked'] for item in preflights),
+        'placeholder_strings': sum(item['placeholder_strings'] for item in preflights),
+        'richtext_strings': sum(item['richtext_strings'] for item in preflights),
+        'source_markup_fragments': sum(item['source_markup_fragments'] for item in preflights),
+        'issues': sum(item['issues'] for item in preflights),
+    }
+    if quality_validation['status'] != 'PASS':
+        raise RuntimeError(f'placeholder/RichText validation failed: {quality_validation}')
     validation_report = {'resources': reports, 'package': package,
-                         'pak_path': str(dist), 'pak_size': dist.stat().st_size,
-                         'pak_sha256': hashlib.sha256(dist.read_bytes()).hexdigest()}
+                         'stock_input_validation': stock_validation,
+                         'source': source_report,
+                         'counts': counts,
+                         'translation_validation': quality_validation,
+                         'pak_path': str(dist), 'pak_size': pak_size,
+                         'pak_sha256': pak_sha256,
+                         'expected_pak_sha256': EXPECTED_PAK_SHA256,
+                         'deterministic_match': deterministic_match}
     (work / 'build_validation.json').write_text(json.dumps(validation_report, indent=2) + '\n', encoding='utf-8')
     for internal, result in package['edits'].items():
         print(f"{internal}: {result['actual']}/{result['expected']} MATCH; mismatches: {result['mismatches']}")
-    print(f"Verified candidate: {dist} ({dist.stat().st_size:,} bytes); SHA-256 {validation_report['pak_sha256']}")
+    print(f"Placeholder/printf/RichText preflight: {quality_validation['entries_checked']} entries, "
+          f"{quality_validation['issues']} issues; PASS")
+    print(f"Verified production PAK: {dist} ({pak_size:,} bytes); SHA-256 {pak_sha256}; byte-identical: YES")
     return 0
 
 

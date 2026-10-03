@@ -18,6 +18,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "work" / "tools"
 URL = "https://github.com/trumank/repak/releases/download/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip"
 EXPECTED_SHA256 = "6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa"
+DEPOTDOWNLOADER_URL = "https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-windows-x64.zip"
+DEPOTDOWNLOADER_SHA256 = "41c9e9f0df54b3ad02e67a11726756e5c73283bd7c2e1b04acfa5ae4c2ed3767"
+DEPOTDOWNLOADER_VERSION = "3.4.0"
 OOZ_COMMIT = '05038060aa68f9187ae9923b2388ca8db40e58d1'
 OOZ_FILES = {
     'kraken.cpp': '20c48a30db54efa7681f8c9c674f2a16f081373872d033885a6fdf244b9cff01',
@@ -70,6 +73,23 @@ def prepare_repak():
     if result.stdout.strip() != 'repak_cli 0.2.3':
         raise RuntimeError(f'Unexpected repak version: {result.stdout}')
     print('repak v0.2.3 ready; release ZIP SHA-256 verified')
+
+
+def prepare_depotdownloader():
+    folder = TOOLS / 'depotdownloader'
+    archive = folder / 'DepotDownloader-windows-x64.zip'
+    ensure_download(DEPOTDOWNLOADER_URL, archive, DEPOTDOWNLOADER_SHA256)
+    with zipfile.ZipFile(archive) as package:
+        names = set(package.namelist())
+        required = {'DepotDownloader.exe', 'LICENSE'}
+        if names != required:
+            raise RuntimeError(f'Unexpected DepotDownloader {DEPOTDOWNLOADER_VERSION} archive contents: {sorted(names)}')
+        for name in sorted(required):
+            write_changed(folder / name, package.read(name))
+    executable = folder / 'DepotDownloader.exe'
+    if not executable.is_file() or executable.stat().st_size < 1_000_000:
+        raise RuntimeError('Verified DepotDownloader executable was not extracted correctly')
+    print(f'DepotDownloader {DEPOTDOWNLOADER_VERSION} ready; release ZIP SHA-256 verified')
 
 
 def compiler_setup() -> Path:
@@ -143,6 +163,7 @@ def main() -> int:
         raise RuntimeError('Bootstrap requires Windows x64 and 64-bit Python')
     TOOLS.mkdir(parents=True, exist_ok=True)
     prepare_repak()
+    prepare_depotdownloader()
     prepare_ooz()
     return 0
 

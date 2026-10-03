@@ -4,7 +4,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.bootstrap import ensure_download
+from tools.bootstrap import (
+    DEPOTDOWNLOADER_SHA256,
+    DEPOTDOWNLOADER_VERSION,
+    ensure_download,
+)
 
 
 class CacheTests(unittest.TestCase):
@@ -25,3 +29,8 @@ class CacheTests(unittest.TestCase):
                     ensure_download('https://example.invalid', path, hashlib.sha256(b'verified').hexdigest())
             self.assertEqual(path.read_bytes(), b'old')
             self.assertFalse(path.with_suffix('.partial').exists())
+
+    def test_depotdownloader_release_is_version_and_hash_pinned(self):
+        self.assertEqual(DEPOTDOWNLOADER_VERSION, '3.4.0')
+        self.assertEqual(DEPOTDOWNLOADER_SHA256,
+                         '41c9e9f0df54b3ad02e67a11726756e5c73283bd7c2e1b04acfa5ae4c2ed3767')

@@ -20,6 +20,13 @@
 - ZIP SHA-256: `6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa`.
 - Writes/reopens our V11 patch, not the source V12 PAK. ZIP, executable and licenses stay in ignored `work/tools/`.
 
+## SteamRE/DepotDownloader
+
+- Version **3.4.0**, **GPL-2.0**; its official release archive includes the license text.
+- Asset: https://github.com/SteamRE/DepotDownloader/releases/download/DepotDownloader_3.4.0/DepotDownloader-windows-x64.zip
+- The upstream release does not publish an asset digest. The downloaded official x64 archive is pinned locally in `tools/bootstrap.py` with SHA-256 `41c9e9f0df54b3ad02e67a11726756e5c73283bd7c2e1b04acfa5ae4c2ed3767`.
+- Used with anonymous access for app `2430930`, depot `2430931`, and an explicit file list containing only `pakchunk0-WindowsServer.pak`. It is never given user credentials. The archive, executable and license remain in ignored `work/tools/`.
+
 ## Technical references only
 
 - TradFR: https://github.com/valentin-gosselin/ark-ascended-fr

@@ -56,8 +56,9 @@ def guarded(function):
 def main():
     # Static proof includes every project module in the production build and
     # bootstrap. The optional test scripts are deliberately outside this list.
-    production = ['build.py', 'tools/steam.py', 'tools/locres.py', 'tools/pakv12.py',
-                  'tools/oodle.py', 'tools/bootstrap.py', 'tools/ooz_bridge.cpp', 'tools/corrections.py']
+    production = ['build.py', 'tools/steam.py', 'tools/server_depot.py', 'tools/locres.py',
+                  'tools/pakv12.py', 'tools/oodle.py', 'tools/bootstrap.py',
+                  'tools/ooz_bridge.cpp', 'tools/corrections.py']
     for name in production:
         content = (ROOT / name).read_text(encoding='utf-8').lower()
         if any(word in content for word in ('devkit', 'unrealpak', 'epicgameslauncher')):
@@ -81,8 +82,12 @@ def main():
         else:
             raise RuntimeError('Standalone guard self-test failed')
     violations.clear()
-    os.environ['ASA_UNREALPAK'] = r'D:\ARKDevkit\guard-must-reject\UnrealPak.exe'
-    sys.argv = [str(ROOT / 'build.py'), *sys.argv[1:]]
+    default_server_pak = ROOT / 'work/server-depot/content/ShooterGame/Content/Paks/pakchunk0-WindowsServer.pak'
+    source_pak = Path(os.environ.get('ASA_TEST_SERVER_PAK', default_server_pak)).resolve()
+    if not source_pak.is_file():
+        raise RuntimeError('Set ASA_TEST_SERVER_PAK to a verified server PAK or run the production Steam build first')
+    sys.argv = [str(ROOT / 'build.py'), '--source', 'server-pak', '--server-pak', str(source_pak),
+                '--output', str(ROOT / 'work/standalone-build/ASA_RU_Fix_P.pak')]
     try:
         runpy.run_path(str(ROOT / 'build.py'), run_name='__main__')
     except SystemExit as exc:
