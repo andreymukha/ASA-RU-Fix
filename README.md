@@ -1,35 +1,39 @@
 # ASA RU Fix
 
-Russian localization fixes for ARK: Survival Ascended on Windows 11 x64. **ARK DevKit: NOT REQUIRED.** Each build reads current official EN/RU resources from the installed game's PAK, applies corrections to the complete official RU LOCRES, and creates a verified patch. Official translations and generated/downloaded binaries are not committed.
+Russian localization fixes for ARK: Survival Ascended on Windows 11 x64. **ARK client and DevKit are not required to build.** The production pipeline reads the four pinned official EN/RU LOCRES files from the Steam Dedicated Server depot, applies corrections to the complete official RU LOCRES resources, and creates a verified patch. Official translations and generated/downloaded binaries are not committed.
 
 ## Build
 
 Requirements:
 
-- Windows x64, 64-bit Python 3.10+, Steam-installed ASA.
+- Windows x64 and 64-bit Python 3.12.
 - First ooz compilation: **Visual Studio 2022 Build Tools**, Desktop development with C++, MSVC x64 and Windows SDK. This compiler is independent of DevKit. A cached verified DLL needs no compiler on subsequent builds/bootstrap runs.
-- Internet for the first bootstrap download.
+- Internet for downloading pinned build tools and the selected Steam depot. The game client itself is not needed.
 
 ```powershell
 python tools/bootstrap.py
 python build.py
-# Optional explicit game installation:
-python build.py --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
+# Optional developer source using a local game install:
+python build.py --source installed-game --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
 ```
 
 Review the **FINAL V1** artifact `dist/ASA_RU_Fix_P.pak` and [verification notes](V1_CANDIDATE.md). Russian correction conventions are documented in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). `python build.py` only creates the patch; use the launcher below to rebuild and install it after a game update.
 
-## Обновление после патча ARK
+## Стабильная локальная v1
 
-После обновления ARK дважды щёлкните **«Обновить перевод.vbs»** в корне проекта. Скрипт запускает сборку и `install.ps1` без видимого окна консоли; полный вывод сохраняется в `work/update.log`. При ошибке сборки установка не запускается, а подробности остаются в логе.
+На время миграции стабильная локальная версия сохранена отдельно в `E:\Projects\ARK Survival\ASA-RU-Fix-legacy-v1`. Для обычного обновления перевода после патча ARK используйте этот снимок v1 и его файл **«Обновить перевод.vbs»**. Текущий `master` предназначен для сборки из закреплённого серверного манифеста и ручной облачной проверки; он не отслеживает новые версии ARK автоматически.
 
-Our `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or other installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. After unpacking the PAK, every correction must match its expected value; counts and artifact SHA-256 are recorded in ignored `work/build_validation.json`.
+`python build.py` selects only `pakchunk0-WindowsServer.pak` from pinned Dedicated Server manifest `3251368963427721326`, then validates all four LOCRES files by size, SHA-256, version and entry count before translation. `--source server-pak --server-pak PATH` is available for local repeatable checks. `--source installed-game` is a developer fallback. `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. The production build fails unless the final PAK matches the pinned v1 size and SHA-256; details are recorded in ignored `work/build_validation.json`.
 
 Scope: ASA's current **unencrypted PAK V12**, compact entries, None/Oodle compression. Unsupported versions, encrypted index/payload, missing exact paths, unknown compression and malformed ranges fail explicitly. Metadata and each extracted resource are capped at 64 MiB. Future storage-format changes may require reader updates; no silent alternative extractor exists. Use trusted installed game content: upstream ooz is not fuzz safe.
 
 ## Bootstrap cache
 
-Artifacts, pinned source and licenses stay in ignored `work/tools/`. repak's official v0.2.3 ZIP and every ooz source file have pinned SHA-256. Bootstrap reuses verified downloads, restores repak from its cached ZIP if needed, and reuses ooz only when its source/build recipe and recorded DLL hash match. It does not download or compile on every run. Delete `work/tools/ooz/build.json` to rebuild from pinned source. Nothing is downloaded by `build.py`.
+Artifacts, pinned source and licenses stay in ignored `work/tools/`. repak v0.2.3 and DepotDownloader 3.4.0 release archives, plus every ooz source file, have pinned SHA-256. Bootstrap reuses verified downloads, restores tools from their cached archives if needed, and reuses ooz only when its source/build recipe and recorded DLL hash match. It does not download or compile on every run. Delete `work/tools/ooz/build.json` to rebuild from pinned source.
+
+## Manual cloud build
+
+The GitHub Actions workflow [cloud-build.yml](.github/workflows/cloud-build.yml) is triggered only by `workflow_dispatch`. It runs on `windows-latest` with Python 3.12, bootstraps pinned tools, downloads only the required server PAK from the pinned manifest, runs the production build and full tests, then uploads `ASA_RU_Fix_P.pak`, `cloud-build-report.json` and a compact validation log as `asa-ru-fix-cloud-build` for three days. It does not publish releases or change repository contents. Build pins, input hashes and local/cloud verification notes are in [docs/cloud-build.md](docs/cloud-build.md) and [TESTING.md](TESTING.md). Start it from the repository's Actions tab when a cloud verification is needed.
 
 ## Corrections
 
@@ -37,7 +41,7 @@ Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text.
 
 Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stores explicitly reviewed EN-only ShooterGame keys. Build copies their EN namespace/key/source hashes and inserts them in native EN order into the stock RU base, then rebuilds string tables/refcounts. Keys already present in RU, unknown EN keys or incompatible stock order fail explicitly. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
 
-The current **FINAL V1** contains 1200 corrections, 43 ShooterGame additions and 21 Engine edits. Batch 33 distinguishes equipment slots: LEGS remains «Ноги» and FEET is «Ступни». The artifact passed production build, repak info/list/unpack, repeated LOCRES validation and all 67 tests. See [V1_CANDIDATE.md](V1_CANDIDATE.md) for artifact details, verification and known limitations.
+The current **FINAL V1** contains 1200 corrections, 43 ShooterGame additions and 21 Engine edits. Batch 33 distinguishes equipment slots: LEGS remains «Ноги» and FEET is «Ступни». The artifact passed production build, repak info/list/unpack, repeated LOCRES validation and all 67 original tests. See [V1_CANDIDATE.md](V1_CANDIDATE.md) for artifact details, verification and known limitations.
 
 `data/engine_ru.json` contains only confirmed `InputKeys` identities. Engine EN/RU resources are freshly extracted from the same installed V12 PAK. Existing RU keys are corrected; an explicitly requested EN-only key is inserted by the same safe merge. Production packs both Engine RU and ShooterGame RU LOCRES, then reopens both and verifies every translation and byte. `Tilde` has no confirmed InputKeys entry in the current resources and is not guessed.
 
@@ -68,7 +72,7 @@ python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-The second command runs the complete production build with filesystem, DLL, import and process guards; only cached repak may run. `tests/compare_devkit.py --unrealpak PATH_TO_REFERENCE_TOOL` is an optional development oracle comparison, never imported by production and not needed after removing DevKit. Recorded results: [TESTING.md](TESTING.md).
+The second command reruns the complete production build from the already downloaded server PAK with filesystem, DLL, import and process guards; only cached repak may run. Set `ASA_TEST_SERVER_PAK` to use a server PAK from another cache location. `tests/compare_devkit.py --unrealpak PATH_TO_REFERENCE_TOOL` is a historical optional development oracle comparison, never imported by production and not needed for this pipeline. Recorded results: [TESTING.md](TESTING.md).
 
 ## Install / uninstall later
 

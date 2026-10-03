@@ -1,0 +1,49 @@
+name: Manual cloud production build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12 x64
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          architecture: x64
+
+      - name: Bootstrap pinned build tools
+        run: python tools/bootstrap.py
+
+      - name: Download pinned depot and build production PAK
+        run: python build.py --source steam --manifest 3251368963427721326
+
+      - name: Run full test suite and write cloud report
+        run: python tools/cloud_report.py
+
+      - name: Prepare exact artifact contents
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force work\artifact | Out-Null
+          Copy-Item dist\ASA_RU_Fix_P.pak work\artifact\ASA_RU_Fix_P.pak
+          Copy-Item work\cloud-build-report.json work\artifact\cloud-build-report.json
+          Copy-Item work\cloud-validation.log work\artifact\cloud-validation.log
+
+      - name: Upload verified build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asa-ru-fix-cloud-build
+          path: work/artifact/
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0

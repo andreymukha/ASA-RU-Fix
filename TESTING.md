@@ -1,4 +1,12 @@
-# Standalone verification — 2026-10-01
+# Verification record
+
+## Pinned Steam build pipeline — 2026-10-03
+
+The main build now defaults to a pinned Steam Dedicated Server source and no longer requires the installed client. Bootstrap restored repak v0.2.3, verified the official DepotDownloader 3.4.0 archive against its pinned SHA-256, and reused the pinned ooz DLL. The already-downloaded PoC server PAK was used as the local source for a complete integration build; no second 1.15 GB depot download was made.
+
+All four stock LOCRES matched pinned size/SHA/version/entry totals. Placeholder/printf/RichText validation checked 1264 edits with zero issues. PAK roundtrip `repak info/list/unpack`, LOCRES reparse and byte comparison passed: 1200/1200 corrections, 43/43 additions and 21/21 Engine edits. The output was **10,795,036 bytes**, SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`, identical to v1. The full unit suite passed: **75 tests**. The guarded standalone production build passed from the cached server PAK; only four cached repak invocations were allowed.
+
+The manual workflow is implemented, but a hosted run has not been possible from this checkout: `git remote -v` is empty and `gh repo view andreymukha/ASA-RU-Fix` returns 404. No repository was created and no GitHub state was changed. A successful GitHub-hosted run remains pending the correct accessible repository/remote.
 
 ## FINAL V1
 
@@ -7,6 +15,7 @@ See [V1_CANDIDATE.md](V1_CANDIDATE.md) for the current artifact, counts, targete
 Production commands:
 
 ```powershell
+python tools/bootstrap.py
 python build.py
 python -m unittest discover -s tests -v
 python tests/standalone_build.py
