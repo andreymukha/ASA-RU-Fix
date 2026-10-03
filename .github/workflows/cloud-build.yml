@@ -1,7 +1,7 @@
 name: Manual cloud production build
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
