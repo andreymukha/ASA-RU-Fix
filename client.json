@@ -1,0 +1,26 @@
+{
+  "artifact": {
+    "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/updater-v1.0.0/ASA-RU-Fix.exe",
+    "filename": "ASA-RU-Fix.exe",
+    "sha256": "a043c978a6e1f2f0673b35011361a29f37c458d6d1e2f5ecaf98062feaa0f74e",
+    "size": 116246264
+  },
+  "build": {
+    "debug_type": "embedded",
+    "native_libraries_self_extract": true,
+    "runtime": "10.0.12",
+    "runtime_identifier": "win-x64",
+    "sdk": "10.0.401",
+    "self_contained": true,
+    "signing": "unsigned",
+    "single_file": true,
+    "trimmed": false
+  },
+  "release": {
+    "commit": "c4e30fa0e8b77d5d48e6d2d06d6d972668c44351",
+    "published_at": "2026-10-03T05:48:55Z",
+    "tag": "updater-v1.0.0"
+  },
+  "schema": 1,
+  "version": "1.0.0"
+}
