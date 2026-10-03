@@ -3,6 +3,7 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
@@ -10,5 +11,9 @@
     <PackageReference Include="MSTest.TestFramework" Version="4.4.1" />
     <ProjectReference Include="../../src/AsaRuFix.Core/AsaRuFix.Core.csproj" />
     <Compile Include="../../src/AsaRuFix.App/WindowsPlatform.cs" Link="WindowsPlatform.cs" />
+    <Compile Include="../../src/AsaRuFix.App/MainForm.cs" Link="MainForm.cs" />
+    <Compile Include="../../src/AsaRuFix.App/AppRuntime.cs" Link="AppRuntime.cs" />
+    <Compile Include="../../src/AsaRuFix.App/SelfUpdateHelper.cs" Link="SelfUpdateHelper.cs" />
+    <Compile Include="../../src/AsaRuFix.App/UninstallHelper.cs" Link="UninstallHelper.cs" />
   </ItemGroup>
 </Project>

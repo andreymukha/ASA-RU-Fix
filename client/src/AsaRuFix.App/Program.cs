@@ -11,6 +11,9 @@ internal static class Program
         ApplicationConfiguration.Initialize();
         try
         {
+            // Предпросмотр обходит переадресацию на установленный EXE и очистку отложенных обновлений.
+            if (args.Length == 1 && args[0] == "--ui-preview")
+            { Application.Run(new MainForm(uninstall: false, preview: true)); return 0; }
             if (args.Length == 2 && args[0] == "--diagnose-json")
             { AppRuntime.DiagnoseAsync(args[1]).GetAwaiter().GetResult(); return 0; }
             if (args.Length >= 3 && args[0] == "--steam-launch" && args[1] == "--")
