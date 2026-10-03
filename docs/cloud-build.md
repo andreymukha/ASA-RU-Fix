@@ -125,9 +125,11 @@ PowerShell `` `t `` создаёт настоящий TAB. `--key` можно п
 
 Patch-компонент версии `x.y.z` повышается только для другого PAK. Если новый manifest или fingerprint даёт прежние байты, новая версия не создаётся: состояние успешной обработки обновляется, последний рабочий asset сохраняется. Публикация сначала проверяет Release и его asset, затем передвигает канал; конфликт обновления ref прекращает запись. Publisher использует `gh`, не меняет аутентификацию и не печатает токены.
 
+Перед публикацией нового PAK `automation.json` сохраняет `pending_release`: версию, commit и исходный проверенный отчёт. Если upload или запись канала прерваны, повтор той же пары использует исходные байты manifest/report/checksums и дополняет draft без перезаписи assets. Незавершённая транзакция с другими входными данными требует явного ручного решения; она не удаляется молча. Публичный Release и `stable.json` не заменяются результатом неуспешной проверки.
+
 Workflow использует `GITHUB_TOKEN` с `permissions: contents: write` для Release, тегов и ветки `channel`. Дополнительный персональный токен не требуется. Группа concurrency — `asa-ru-fix-live-update`, `cancel-in-progress: false`: следующая обработка ожидает завершения текущей.
 
-Расписание **`17,47 * * * *`**, дважды в час, подготовлено и включается только после реального PASS серверной проверки и публикации. До подтверждения оно остаётся отключённым; ручной запуск доступен. Фактический статус и доказательства запусков фиксируются в [TESTING.md](../TESTING.md) и [V1_CANDIDATE.md](../V1_CANDIDATE.md), а не выводятся из наличия workflow-файла.
+Расписание **`17,47 * * * *` включено**, дважды в час, после реальных PASS pinned, live и fast-path проверок. Ручной запуск также доступен. Фактические доказательства приведены в [отчёте серверной проверки](server-automation-verification.md), [TESTING.md](../TESTING.md) и [V1_CANDIDATE.md](../V1_CANDIDATE.md).
 
 GitHub автоматически отключает scheduled workflow публичного репозитория после **60 дней без активности репозитория**. Это ограничение платформы; восстановить расписание можно через Actions, API или GitHub CLI. См. [официальную документацию GitHub](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows). Также возможны задержки запуска schedule, а выполнение привязано к default branch: [GitHub: события workflow](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 

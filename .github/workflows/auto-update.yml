@@ -1,6 +1,8 @@
 name: Automatic stable localization update
 
 on:
+  schedule:
+    - cron: "17,47 * * * *"
   workflow_dispatch:
     inputs:
       force_rebuild:

@@ -1,3 +1,17 @@
+# FINAL V1 — серверный stable channel
+
+Серверная автоматизация готова. Проверенный [Release v1.0.0](https://github.com/andreymukha/ASA-RU-Fix/releases/tag/v1.0.0) и [stable.json](https://raw.githubusercontent.com/andreymukha/ASA-RU-Fix/channel/stable.json) доступны публично. Клиентский updater и пользовательская доставка ещё не реализованы.
+
+Текущие authoritative данные: 1243 desired ShooterGame в `data/shootergame_ru.json`, 21 Engine в `data/engine_ru.json`, 1264 принятые EN identities. На текущем manifest `3251368963427721326` динамические классы ShooterGame = 1199/43/1; Engine = 16/1/4 (corrections/additions/already_correct). Старые corrections/additions объединены без изменения русских текстов.
+
+PAK: 10795036 bytes; SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`. Pinned и live hosted builds, все desired values, format/repak проверки и 168 tests — PASS. Повторный hosted run доказал fast path без скачивания server PAK; расписание включено после PASS. Подробные доказательства — [серверный отчёт](docs/server-automation-verification.md) и [TESTING.md](TESTING.md).
+
+Известные ограничения сохранены: WEIGHT / Crafting Requirements могут оставаться английскими в отдельных виджетах; CS/Cybers Structures не относятся к базовому переводу. ARK, DevKit и локальная установка в этом этапе не запускались. Legacy snapshot сохранён; массового перевода или нового asset scan не было.
+
+## Архив финализации локального v1
+
+Ниже сохранены прежние исследования и batch history. Старые количества corrections/additions описывают соответствующий снимок; актуальные единые данные и динамические классы указаны выше.
+
 # FINAL V1 — 2026-10-02
 
 Status: **FINAL V1**. Batches 32 and 33, the fresh-stock saddle audit and slot corrections are integrated. The user confirmed the earlier Back correction in game. This final artifact passed production build, full LOCRES/PAK validation and the complete test suite. The agent did not launch ARK, install a patch, access the editor toolchain, or scan installed mods.

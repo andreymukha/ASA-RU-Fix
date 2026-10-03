@@ -1,12 +1,26 @@
-# Verification record
+# Проверки проекта
 
-## Pinned Steam build pipeline — 2026-10-03
+## Серверная автоматизация — 2026-10-03
 
-The main build now defaults to a pinned Steam Dedicated Server source and no longer requires the installed client. Bootstrap restored repak v0.2.3, verified the official DepotDownloader 3.4.0 archive against its pinned SHA-256, and reused the pinned ooz DLL. The already-downloaded PoC server PAK was used as the local source for a complete integration build; no second 1.15 GB depot download was made.
+Серверный pipeline и публичный stable channel готовы; клиентская доставка ещё не реализована. Подробные исходные данные, четыре stock LOCRES, ссылки на реальные runs и состояние канала: [отчёт проверки](docs/server-automation-verification.md).
 
-All four stock LOCRES matched pinned size/SHA/version/entry totals. Placeholder/printf/RichText validation checked 1264 edits with zero issues. PAK roundtrip `repak info/list/unpack`, LOCRES reparse and byte comparison passed: 1200/1200 corrections, 43/43 additions and 21/21 Engine edits. The output was **10,795,036 bytes**, SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`, identical to v1. The full unit suite passed: **75 tests**. The guarded standalone production build passed from the cached server PAK; only four cached repak invocations were allowed.
+- Pinned hosted [37096446767](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/37096446767): PASS, 168 tests, artifact скачан и побайтно совпадает с legacy.
+- Live hosted [37096442392](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/37096442392): PASS, 168 tests, manifest `3251368963427721326`, 1146602176 downloaded bytes.
+- Fast path [37096569230](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/37096569230): PASS за 33 s, 0 PAK bytes, без full bootstrap/ooz/repak/build/full tests/Release и без state commit.
+- 1243/1243 ShooterGame и 21/21 Engine desired MATCH после repak info/list/unpack и повторного LOCRES parse; placeholders/printf/RichText: 0 ошибок.
+- Локальный полный suite: 168 PASS. Standalone guard: PASS, 0 запрещённых доступов, четыре cached repak процесса.
+- PAK: 10795036 bytes; SHA-256 `914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b`.
+- Release v1.0.0 создан из доказанного cloud artifact; публичная загрузка PAK без токена и побайтное сравнение с legacy — PASS. Live PAK тот же: v1.0.1 не создан.
+- Orphan channel commit `db32838a078c7fa2e66a657cf4b9f31b32224dab`, automation success; same pair не создаёт heartbeat commit. Расписание `17,47 * * * *` включено после всех PASS.
+- Fixtures покрывают EN/RU динамику, identity guard, retries/block, force, SHA/no-release/patch increment и восстановление immutable Release transaction.
 
-The manual workflow is implemented, but a hosted run has not been possible from this checkout: `git remote -v` is empty and `gh repo view andreymukha/ASA-RU-Fix` returns 404. No repository was created and no GitHub state was changed. A successful GitHub-hosted run remains pending the correct accessible repository/remote.
+Русские тексты при объединении 1200 corrections + 43 additions не изменены. Единственный ShooterGame dataset содержит 1243 ключа; текущие классы 1199 corrections / 43 additions / 1 already_correct. Engine: 16 / 1 / 4, всего 21. Все 1264 EN identities проверяются; ни одно новое source identity не принимается автоматически.
+
+В этом этапе ARK/DevKit/install не запускались. Legacy snapshot, игровые файлы и клиентская доставка не изменены. Пользовательское подтверждение кнопки «Назад» сохраняется как ранее полученное in-game свидетельство; нового запуска игры не было.
+
+## Архив предыдущих проверок
+
+Ниже сохранена история до перехода на unified/live pipeline. Её старые counters, отдельные corrections/additions, локальные launcher и optional oracle commands не являются текущими требованиями серверной сборки. Актуальные результаты приведены выше.
 
 ## FINAL V1
 

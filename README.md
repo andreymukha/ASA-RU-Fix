@@ -73,7 +73,9 @@ python -m tools.corrections --candidate PATH_TO_REVIEWED.json
 
 Решение о сборке зависит от пары `(manifest_id, build_fingerprint)`. Уже успешно обработанная пара пропускается. После двух ошибок одной пары дальнейшие автоматические сборки блокируются до изменения входов либо ручного `force_rebuild`. Patch-компонент версии повышается только при изменении байтов PAK; новый manifest с прежним PAK обновляет сведения об успешной обработке без новой версии.
 
-Расписание `17,47 * * * *` подготовлено для запуска дважды в час и включается только после реального PASS серверной проверки. До такого подтверждения используется ручной запуск. `GITHUB_TOKEN` workflow требует `contents: write`; группа concurrency `asa-ru-fix-live-update` использует `cancel-in-progress: false`. Подробности публикации, состояния и восстановления приведены в [документации облачного процесса](docs/cloud-build.md#автоматическое-обновление-и-публикация).
+Расписание **`17,47 * * * *` включено** после успешных hosted pinned/live и fast-path проверок. `GITHUB_TOKEN` workflow требует только `contents: write`; группа concurrency `asa-ru-fix-live-update` использует `cancel-in-progress: false`. Подробности публикации, состояния и восстановления приведены в [документации облачного процесса](docs/cloud-build.md#автоматическое-обновление-и-публикация), фактические результаты — в [отчёте проверки](docs/server-automation-verification.md).
+
+Публичный канал для будущего updater: [stable.json](https://raw.githubusercontent.com/andreymukha/ASA-RU-Fix/channel/stable.json). Готовый PAK опубликован в [Release v1.0.0](https://github.com/andreymukha/ASA-RU-Fix/releases/tag/v1.0.0). Клиентская доставка на этом этапе ещё не реализована.
 
 Цель будущего клиента — получать небольшой PAK, ориентировочно 11 MB, по проверяемому `stable.json`, вместо локального извлечения ресурсов игры. Сам клиент и Steam-launch относятся к следующему этапу.
 
