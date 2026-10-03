@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import os
 import shutil
@@ -159,9 +160,15 @@ def prepare_ooz():
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--probe-only', action='store_true', help='Prepare only DepotDownloader for lightweight manifest probe')
+    args = parser.parse_args()
     if sys.platform != 'win32' or struct.calcsize('P') != 8:
         raise RuntimeError('Bootstrap requires Windows x64 and 64-bit Python')
     TOOLS.mkdir(parents=True, exist_ok=True)
+    if args.probe_only:
+        prepare_depotdownloader()
+        return 0
     prepare_repak()
     prepare_depotdownloader()
     prepare_ooz()

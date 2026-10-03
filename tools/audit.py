@@ -319,7 +319,7 @@ def run_audit(root: Path = ROOT) -> dict:
     en_path, ru_path = root / 'work/en.json', root / 'work/ru.json'
     en = _mapping(_load_json(en_path), str(en_path))
     ru = _mapping(_load_json(ru_path), str(ru_path))
-    corrections = _mapping(_load_json(root / 'data/corrections.json'), 'data/corrections.json')
+    corrections = _mapping(_load_json(root / 'data/shootergame_ru.json'), 'data/shootergame_ru.json')
     term_data = _load_json(root / 'data/audit_terms.json')
     terms = term_data.get('known_bad_terms') if isinstance(term_data, dict) else None
     if not isinstance(terms, list) or any(
@@ -365,7 +365,7 @@ def run_audit(root: Path = ROOT) -> dict:
         'inputs': {
             'en_sha256': hashlib.sha256(en_path.read_bytes()).hexdigest(),
             'ru_sha256': hashlib.sha256(ru_path.read_bytes()).hexdigest(),
-            'corrections_sha256': hashlib.sha256((root / 'data/corrections.json').read_bytes()).hexdigest(),
+            'desired_sha256': hashlib.sha256((root / 'data/shootergame_ru.json').read_bytes()).hexdigest(),
             'audit_terms_sha256': hashlib.sha256((root / 'data/audit_terms.json').read_bytes()).hexdigest(),
         },
         'outputs': {

@@ -162,8 +162,8 @@ def parse(data: bytes) -> Resource:
 def insert_missing(ru: Resource, en: Resource, additions: dict[str, str]) -> Resource:
     """Insert explicitly requested EN entries into RU in native EN order.
 
-    Fail if the stock RU sequence is not an EN subsequence. This avoids
-    inventing a position or reordering the existing RU resource.
+    Preserve every existing RU entry, including unrelated RU-only keys.
+    Shared entries must retain their EN order; additions use EN anchors.
     """
     if not additions:
         return ru
@@ -174,19 +174,32 @@ def insert_missing(ru: Resource, en: Resource, additions: dict[str, str]) -> Res
         raise LocresError('additions require EN exists + RU missing')
     if ru.version != en.version:
         raise LocresError('EN/RU LOCRES versions differ')
-    if [identity(e) for e in en.entries if identity(e) in ru_entries] != list(ru_entries):
+    if [identity(e) for e in en.entries if identity(e) in ru_entries] != [
+            identity(e) for e in ru.entries if identity(e) in en_entries]:
         raise LocresError('stock RU order is not a native EN subsequence')
     strings = list(ru.strings)
-    entries = []
+    entries = list(ru.entries)
+    en_position = {identity(e): i for i, e in enumerate(en.entries)}
+    namespace_position = {}
+    for source in en.entries:
+        namespace_position.setdefault(source.namespace.value, len(namespace_position))
     for source in en.entries:
         key = identity(source)
-        if key in ru_entries:
-            entries.append(ru_entries[key])
-        elif key in additions:
+        if key in additions:
             if not isinstance(additions[key], str) or not additions[key].strip():
                 raise LocresError('addition must be nonempty text')
-            entries.append(replace(source, namespace=replace(source.namespace),
-                                   key=replace(source.key), value_index=len(strings)))
+            same_namespace = [i for i, entry in enumerate(entries)
+                              if entry.namespace.value == source.namespace.value]
+            if same_namespace:
+                position = next((i for i in same_namespace
+                                 if en_position.get(identity(entries[i]), -1) > en_position[key]),
+                                same_namespace[-1] + 1)
+            else:
+                position = next((i for i, entry in enumerate(entries)
+                                 if namespace_position.get(entry.namespace.value, -1) >
+                                 namespace_position[source.namespace.value]), len(entries))
+            entries.insert(position, replace(source, namespace=replace(source.namespace),
+                                             key=replace(source.key), value_index=len(strings)))
             strings.append(FString(additions[key], any(ord(c) > 127 for c in additions[key])))
     refs = [0] * len(strings)
     for entry in entries:

@@ -1,4 +1,4 @@
-name: Manual cloud production build
+name: Pinned regression build
 
 on:
   workflow_dispatch: {}
@@ -26,7 +26,7 @@ jobs:
         run: python tools/bootstrap.py
 
       - name: Download pinned depot and build production PAK
-        run: python build.py --source steam --manifest 3251368963427721326
+        run: python build.py --profile pinned --source steam --manifest 3251368963427721326
 
       - name: Run full test suite and write cloud report
         run: python -m tools.cloud_report

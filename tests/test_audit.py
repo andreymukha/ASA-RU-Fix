@@ -212,7 +212,7 @@ class AuditLogicTests(unittest.TestCase):
             root = Path(folder)
             (root / 'data').mkdir()
             (root / 'work').mkdir()
-            (root / 'data/corrections.json').write_text(json.dumps({'n\ta': 'Назад'}), encoding='utf-8')
+            (root / 'data/shootergame_ru.json').write_text(json.dumps({'n\ta': 'Назад'}), encoding='utf-8')
             (root / 'data/audit_terms.json').write_text('{"known_bad_terms": []}', encoding='utf-8')
             (root / 'work/en.json').write_text(json.dumps({'n\ta': 'Back', 'n\tb': 'Save'}), encoding='utf-8')
             (root / 'work/ru.json').write_text(json.dumps({'n\ta': 'Спина', 'n\tc': 'Звук'}), encoding='utf-8')

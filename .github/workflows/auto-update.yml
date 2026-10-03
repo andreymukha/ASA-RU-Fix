@@ -1,0 +1,57 @@
+name: Automatic stable localization update
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Повторить полную проверку даже для обработанной или заблокированной пары"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: asa-ru-fix-live-update
+  cancel-in-progress: false
+
+jobs:
+  live-update:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FORCE_REBUILD: ${{ inputs.force_rebuild || false }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12 x64
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          architecture: x64
+
+      - name: Probe Steam and update verified stable channel
+        shell: pwsh
+        run: |
+          $updateArgs = @('-m', 'tools.auto_update', 'run', '--repository', $env:GITHUB_REPOSITORY)
+          if ($env:FORCE_REBUILD -eq 'true') { $updateArgs += '--force-rebuild' }
+          python @updateArgs
+          exit $LASTEXITCODE
+
+      - name: Preserve diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asa-ru-fix-live-report
+          path: |
+            work/live-build-report.json
+            work/live-process.log
+            work/live-validation.log
+          if-no-files-found: warn
+          retention-days: 3

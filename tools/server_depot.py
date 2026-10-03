@@ -49,8 +49,11 @@ def validate_stock_resources(
     *,
     specs: Mapping[str, StockSpec | Mapping[str, object]] = PINNED_STOCK,
     require_all: bool = True,
+    profile: str = "pinned",
 ) -> dict[str, dict[str, object]]:
     """Fail closed unless pinned bytes and parsed LOCRES metadata match."""
+    if profile not in ("pinned", "live"):
+        raise RuntimeError(f"unknown stock validation profile: {profile}")
     if require_all and set(resources) != set(specs):
         raise RuntimeError(
             f"stock LOCRES set mismatch: expected {sorted(specs)}, got {sorted(resources)}"
@@ -68,24 +71,32 @@ def validate_stock_resources(
         else:
             expected = configured
         actual_size = len(raw)
-        if actual_size != expected["size"]:
+        if profile == "pinned" and actual_size != expected["size"]:
             raise RuntimeError(f"{name} size mismatch: expected {expected['size']}, got {actual_size}")
         actual_hash = hashlib.sha256(raw).hexdigest()
-        if actual_hash != expected["sha256"]:
+        if profile == "pinned" and actual_hash != expected["sha256"]:
             raise RuntimeError(f"{name} SHA-256 mismatch: expected {expected['sha256']}, got {actual_hash}")
         try:
             resource = parse(raw)
         except LocresError as exc:
             raise RuntimeError(f"{name} LOCRES parse failed: {exc}") from exc
-        if resource.version != expected["version"]:
+        if profile == "pinned" and resource.version != expected["version"]:
             raise RuntimeError(f"{name} LOCRES version mismatch: expected {expected['version']}, got {resource.version}")
-        if len(resource.entries) != expected["entries"]:
+        if profile == "pinned" and len(resource.entries) != expected["entries"]:
             raise RuntimeError(f"{name} entry count mismatch: expected {expected['entries']}, got {len(resource.entries)}")
         report[name] = {
             "size": actual_size, "sha256": actual_hash,
             "version": resource.version, "entries": len(resource.entries), "status": "PASS",
         }
     return report
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def download_server_pak(
@@ -97,6 +108,8 @@ def download_server_pak(
 ) -> dict[str, object]:
     """Download only the required server PAK using anonymous DepotDownloader."""
     executable = Path(executable).resolve()
+    if not re.fullmatch(r"[0-9]+", str(manifest)):
+        raise RuntimeError("an exact numeric Steam manifest ID is required")
     if not executable.is_file():
         raise RuntimeError(f"DepotDownloader is missing: {executable}; run python tools/bootstrap.py")
     work_root = Path(work_root).resolve()
@@ -122,7 +135,9 @@ def download_server_pak(
     if pak_files != [SERVER_PAK_RELATIVE.as_posix()]:
         raise RuntimeError(f"DepotDownloader produced unexpected PAK files: {pak_files}")
     match = re.search(r"Total downloaded:\s*([0-9,]+)\s+bytes", output)
-    downloaded_bytes = int(match.group(1).replace(",", "")) if match else None
+    if not match:
+        raise RuntimeError("DepotDownloader did not report downloaded bytes")
+    downloaded_bytes = int(match.group(1).replace(",", ""))
     return {
         "path": pak_path,
         "app_id": APP_ID,

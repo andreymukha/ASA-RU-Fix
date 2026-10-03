@@ -13,8 +13,10 @@ from pathlib import Path
 
 from tools.locres import LocresError, load_edits, parse, serialize, insert_missing
 from tools.corrections import validate_corrections, verify_applied
+from tools.translation_data import classify_desired, load_source_identity
 from tools.steam import find_game
 from tools.pakv12 import PakReader
+from tools.pak_order import canonicalize_pak
 from tools.server_depot import (
     EXPECTED_PAK_SHA256,
     EXPECTED_PAK_SIZE,
@@ -22,6 +24,7 @@ from tools.server_depot import (
     PINNED_STOCK,
     download_server_pak,
     validate_stock_resources,
+    file_sha256,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -93,6 +96,15 @@ def build_resource(en, ru, corrections, additions):
                      'rebuilt_keys': len(actual.entries), 'native_order_and_hashes': 'PASS'}
 
 
+def build_desired_resource(en, ru, desired, identities, resource_name):
+    classified = classify_desired(desired, en, ru, identities, resource_name=resource_name)
+    built, report = build_resource(en, ru, classified['corrections'], classified['additions'])
+    report['classification'] = classified['counts']
+    report['desired_preflight'] = classified['validation']
+    report['desired_verification'] = verify_applied(desired, parse(built).as_dict())
+    return built, report
+
+
 def verify_package(repak, dist, verify_root, resources, edits):
     listing = run_repak(repak, 'list', str(dist))
     entries = [line.strip().replace('\\', '/') for line in listing.splitlines() if line.strip()]
@@ -149,16 +161,27 @@ def resolve_source(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--profile', choices=('pinned', 'live'), default='pinned')
     parser.add_argument('--source', choices=('steam', 'server-pak', 'installed-game'), default='steam',
                         help='Input source (default: pinned Steam Dedicated Server depot)')
-    parser.add_argument('--manifest', default=PINNED_MANIFEST, help='Pinned server depot manifest ID')
+    parser.add_argument('--manifest', help='Exact resolved server depot manifest ID (required for live)')
     parser.add_argument('--server-pak', type=Path, help='Local server PAK for deterministic developer verification')
     parser.add_argument("--game-path", type=Path, help="Explicit ASA installation directory (developer source)")
     parser.add_argument("--repak", type=Path, help="repak v0.2.3 executable")
     parser.add_argument('--output', type=Path, help='Output PAK path (defaults to dist/ASA_RU_Fix_P.pak)')
     args = parser.parse_args()
+    if args.profile == 'pinned':
+        if args.manifest not in (None, PINNED_MANIFEST):
+            parser.error('pinned profile requires the pinned manifest')
+        args.manifest = PINNED_MANIFEST
+    elif not args.manifest or not args.manifest.isdecimal():
+        parser.error('live profile requires an exact numeric --manifest from the probe')
+    (ROOT / 'work').mkdir(parents=True, exist_ok=True)
+    (ROOT / 'work/build_failure.json').unlink(missing_ok=True)
     repak = resolve_repak(args.repak, parser)
     source_pak, source_report = resolve_source(args, parser)
+    source_report['manifest'] = args.manifest
+    source_report['pak_sha256'] = file_sha256(source_pak)
     reader = PakReader(source_pak)
 
     work = ROOT / "work"
@@ -169,10 +192,11 @@ def main() -> int:
     stock_bytes = {}
     for name, spec in PINNED_STOCK.items():
         stock_bytes[name] = reader.extract(spec.relative_path)
-    stock_validation = validate_stock_resources(stock_bytes)
-    for name, internal, correction_file, addition_file in (
-        ('ShooterGame', INTERNAL, 'corrections.json', 'additions.json'),
-        ('Engine', ENGINE_INTERNAL, 'engine_ru.json', None),
+    stock_validation = validate_stock_resources(stock_bytes, profile=args.profile)
+    identities = load_source_identity(ROOT / 'data/source_identity.json')
+    for name, internal, desired_file in (
+        ('ShooterGame', INTERNAL, 'shootergame_ru.json'),
+        ('Engine', ENGINE_INTERNAL, 'engine_ru.json'),
     ):
         stock = {}
         stock_hashes = {}
@@ -188,19 +212,14 @@ def main() -> int:
             dump_name = language if name == 'ShooterGame' else 'engine_' + language
             (work / (dump_name + '.json')).write_text(
                 json.dumps(stock[language].as_dict(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-        edits = load_edits(ROOT / 'data' / correction_file)
+        edits = load_edits(ROOT / 'data' / desired_file)
         if name == 'Engine':
             if any(not key.startswith('InputKeys\t') for key in edits):
                 raise LocresError('Engine edits must belong to InputKeys')
-            additions = {key: value for key, value in edits.items() if key not in stock['ru'].as_dict()}
-            corrections = {key: value for key, value in edits.items() if key not in additions}
-        else:
-            corrections = edits
-            additions = load_edits(ROOT / 'data' / addition_file)
-        built, report = build_resource(stock['en'], stock['ru'], corrections, additions)
+        built, report = build_desired_resource(stock['en'], stock['ru'], edits, identities, name)
         report['stock_sha256'] = stock_hashes
         resources[internal] = built
-        all_edits[internal] = {**corrections, **additions}
+        all_edits[internal] = edits
         reports[name] = report
         path = work / 'rebuilt' / internal
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -208,7 +227,7 @@ def main() -> int:
         dump_name = 'ru_rebuilt' if name == 'ShooterGame' else 'engine_ru_rebuilt'
         (work / (dump_name + '.json')).write_text(
             json.dumps(parse(built).as_dict(), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-        print(f"{name}: {len(corrections)} corrections; {len(additions)} additions; {report['rebuilt_keys']} keys")
+        print(f"{name}: {report['classification']}; {report['rebuilt_keys']} keys")
 
     stage_root = work / 'pak_stage'
     # Refuse stale extra files rather than silently package an old resource.
@@ -225,25 +244,28 @@ def main() -> int:
     dist.parent.mkdir(parents=True, exist_ok=True)
     dist.unlink(missing_ok=True)
     run_repak(repak, 'pack', '--version', 'V11', '--mount-point', '../../../', '--quiet', str(stage_root), str(dist))
+    canonicalize_pak(dist, [INTERNAL, ENGINE_INTERNAL])
     package = verify_package(repak, dist, work / 'pak_verify', resources, all_edits)
     pak_size = dist.stat().st_size
     pak_sha256 = hashlib.sha256(dist.read_bytes()).hexdigest()
     deterministic_match = pak_size == EXPECTED_PAK_SIZE and pak_sha256 == EXPECTED_PAK_SHA256
-    if not deterministic_match:
+    if args.profile == 'pinned' and not deterministic_match:
         raise RuntimeError(
             f'Pinned production PAK mismatch: expected {EXPECTED_PAK_SIZE} bytes / {EXPECTED_PAK_SHA256}, '
             f'got {pak_size} bytes / {pak_sha256}'
         )
-    engine_edit_count = reports['Engine']['corrections_verification']['expected'] + reports['Engine']['additions_verification']['expected']
     counts = {
-        'corrections': reports['ShooterGame']['corrections_verification']['expected'],
-        'additions': reports['ShooterGame']['additions_verification']['expected'],
-        'engine_edits': engine_edit_count,
+        'shooter_desired': reports['ShooterGame']['desired_verification']['expected'],
+        'engine_desired': reports['Engine']['desired_verification']['expected'],
     }
-    if counts != {'corrections': 1200, 'additions': 43, 'engine_edits': 21}:
+    if counts != {'shooter_desired': 1243, 'engine_desired': 21}:
         raise RuntimeError(f'unexpected production translation counts: {counts}')
-    preflights = [reports[resource][kind] for resource in ('ShooterGame', 'Engine')
-                  for kind in ('corrections_preflight', 'additions_preflight')]
+    if args.profile == 'pinned':
+        for resource, expected in (('ShooterGame', (1199, 43, 1)), ('Engine', (16, 1, 4))):
+            actual = reports[resource]['classification']
+            if tuple(actual[k] for k in ('corrections', 'additions', 'already_correct')) != expected:
+                raise RuntimeError(f'pinned classification mismatch: {resource}: {actual}')
+    preflights = [reports[resource]['desired_preflight'] for resource in ('ShooterGame', 'Engine')]
     quality_validation = {
         'status': 'PASS' if all(item['issues'] == 0 for item in preflights) else 'FAIL',
         'entries_checked': sum(item['checked'] for item in preflights),
@@ -254,21 +276,22 @@ def main() -> int:
     }
     if quality_validation['status'] != 'PASS':
         raise RuntimeError(f'placeholder/RichText validation failed: {quality_validation}')
-    validation_report = {'resources': reports, 'package': package,
+    validation_report = {'profile': args.profile, 'resources': reports, 'package': package,
                          'stock_input_validation': stock_validation,
                          'source': source_report,
                          'counts': counts,
                          'translation_validation': quality_validation,
                          'pak_path': str(dist), 'pak_size': pak_size,
                          'pak_sha256': pak_sha256,
-                         'expected_pak_sha256': EXPECTED_PAK_SHA256,
+                         'expected_pak_sha256': EXPECTED_PAK_SHA256 if args.profile == 'pinned' else None,
                          'deterministic_match': deterministic_match}
     (work / 'build_validation.json').write_text(json.dumps(validation_report, indent=2) + '\n', encoding='utf-8')
     for internal, result in package['edits'].items():
         print(f"{internal}: {result['actual']}/{result['expected']} MATCH; mismatches: {result['mismatches']}")
     print(f"Placeholder/printf/RichText preflight: {quality_validation['entries_checked']} entries, "
           f"{quality_validation['issues']} issues; PASS")
-    print(f"Verified production PAK: {dist} ({pak_size:,} bytes); SHA-256 {pak_sha256}; byte-identical: YES")
+    print(f"Verified {args.profile} PAK: {dist} ({pak_size:,} bytes); SHA-256 {pak_sha256}; "
+          f"matches pinned v1: {deterministic_match}")
     return 0
 
 
@@ -276,5 +299,9 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (OSError, LocresError, RuntimeError) as exc:
+        (ROOT / 'work').mkdir(parents=True, exist_ok=True)
+        (ROOT / 'work/build_failure.json').write_text(json.dumps(
+            {'status': 'FAIL', 'error': str(exc), 'issues': getattr(exc, 'issues', [])},
+            ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         print(f"BUILD ERROR: {exc}", file=sys.stderr)
         raise SystemExit(2)

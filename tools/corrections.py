@@ -141,17 +141,32 @@ def verify_applied(corrections: dict[str, str], actual: dict[str, str]) -> dict:
 
 
 def main() -> int:
+    from tools.locres import parse
+    from tools.translation_data import classify_desired, load_source_identity
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, required=True)
-    parser.add_argument('--apply', action='store_true', help='Write corrections only after successful preflight')
+    parser.add_argument('--apply', action='store_true', help='Write desired translations after preflight; new keys require explicit accept-source')
     parser.add_argument('--expected-new', type=int)
     parser.add_argument('--expected-total', type=int)
     args = parser.parse_args()
-    # Run the production build first to refresh these STOCK dumps.
-    en_path, ru_path = ROOT / 'work/en.json', ROOT / 'work/ru.json'
-    corrections_path = ROOT / 'data/corrections.json'
-    merged, report = merge_candidates(load_edits(args.candidate), load_edits(corrections_path),
-                                      load_edits(en_path), load_edits(ru_path))
+    # Use the stock LOCRES identities retained by the production build, rather
+    # than a rebuilt RU dump. New desired keys need a separate explicit review.
+    stock_root = ROOT / 'work/source/ShooterGame/Content/Localization/ShooterGame'
+    en_path, ru_path = stock_root / 'en/ShooterGame.locres', stock_root / 'ru/ShooterGame.locres'
+    en, ru = parse(en_path.read_bytes()), parse(ru_path.read_bytes())
+    desired_path = ROOT / 'data/shootergame_ru.json'
+    existing = load_edits(desired_path)
+    baseline = load_source_identity(ROOT / 'data/source_identity.json')
+    classify_desired(existing, en, ru, baseline)
+    merged, report = merge_candidates(load_edits(args.candidate), existing,
+                                      en.as_dict(), {**en.as_dict(), **ru.as_dict()})
+    pending = sorted(set(merged) - set(baseline['resources']['ShooterGame']))
+    reviewed = {key: value for key, value in merged.items() if key not in pending}
+    report['reviewed_source_counts'] = classify_desired(reviewed, en, ru, baseline)['counts']
+    report['pending_source_acceptance'] = pending
+    report['source_review_note'] = ('New desired keys require: python -m tools.translation_data accept-source '
+                                    '--resource ShooterGame --stock-en PATH --key Namespace<TAB>Key --apply')
     for expected, field in ((args.expected_new, 'new_count'), (args.expected_total, 'total_count')):
         if expected is not None and report[field] != expected:
             raise CorrectionError([{'full_key': '', 'kind': 'unexpected_count',
@@ -159,7 +174,7 @@ def main() -> int:
     report['inputs_sha256'] = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                               for name, path in (('candidate', args.candidate), ('en', en_path), ('ru', ru_path))}
     if args.apply:
-        corrections_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+        desired_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     report['applied'] = args.apply
     (ROOT / 'work/import_validation.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, indent=2))

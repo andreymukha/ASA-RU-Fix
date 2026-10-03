@@ -1,87 +1,115 @@
 # ASA RU Fix
 
-Russian localization fixes for ARK: Survival Ascended on Windows 11 x64. **ARK client and DevKit are not required to build.** The production pipeline reads the four pinned official EN/RU LOCRES files from the Steam Dedicated Server depot, applies corrections to the complete official RU LOCRES resources, and creates a verified patch. Official translations and generated/downloaded binaries are not committed.
+Исправления русской локализации ARK: Survival Ascended для Windows x64. Сборка получает официальные EN/RU LOCRES из Steam Dedicated Server, применяет проверенные переводы к полным RU-ресурсам и создаёт `dist/ASA_RU_Fix_P.pak`. Клиент ARK и DevKit для сборки не нужны. Официальные тексты, загруженные инструменты и созданные бинарные файлы не хранятся в Git.
 
-## Build
+Текущая задача проекта — серверная проверка новых manifest и публикация проверенного PAK с метаданными канала. Клиентский updater, автоматическая установка обновлений и запуск игры через Steam ещё не реализованы. Исторический снимок `E:\Projects\ARK Survival\ASA-RU-Fix-legacy-v1` сохранён отдельно; его прежний launcher не является текущим клиентом нового канала обновлений.
 
-Requirements:
+## Сборка
 
-- Windows x64 and 64-bit Python 3.12.
-- First ooz compilation: **Visual Studio 2022 Build Tools**, Desktop development with C++, MSVC x64 and Windows SDK. This compiler is independent of DevKit. A cached verified DLL needs no compiler on subsequent builds/bootstrap runs.
-- Internet for downloading pinned build tools and the selected Steam depot. The game client itself is not needed.
+Нужны Windows x64, 64-битный Python 3.12 и доступ в интернет. Для первой компиляции ooz требуются Visual Studio 2022 Build Tools, компонент Desktop development with C++, MSVC x64 и Windows SDK. Проверенный кэш DLL позволяет выполнять последующие сборки без компилятора.
 
 ```powershell
 python tools/bootstrap.py
+python build.py --profile pinned
+# То же самое: pinned — профиль по умолчанию.
 python build.py
-# Optional developer source using a local game install:
-python build.py --source installed-game --game-path 'F:\SteamLibrary\steamapps\common\ARK Survival Ascended'
 ```
 
-Review the **FINAL V1** artifact `dist/ASA_RU_Fix_P.pak` and [verification notes](V1_CANDIDATE.md). Russian correction conventions are documented in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). `python build.py` only creates the patch; use the launcher below to rebuild and install it after a game update.
+`pinned` использует manifest `3251368963427721326` приложения `2430930`, depot `2430931`. Сборка загружает только `ShooterGame/Content/Paks/pakchunk0-WindowsServer.pak`, проверяет размер, SHA-256, версию и количество ключей четырёх stock LOCRES, затем сверяет итоговый PAK с закреплённым эталоном.
 
-## Стабильная локальная v1
-
-На время миграции стабильная локальная версия сохранена отдельно в `E:\Projects\ARK Survival\ASA-RU-Fix-legacy-v1`. Для обычного обновления перевода после патча ARK используйте этот снимок v1 и его файл **«Обновить перевод.vbs»**. Текущий `master` предназначен для сборки из закреплённого серверного манифеста и ручной облачной проверки; он не отслеживает новые версии ARK автоматически.
-
-`python build.py` selects only `pakchunk0-WindowsServer.pak` from pinned Dedicated Server manifest `3251368963427721326`, then validates all four LOCRES files by size, SHA-256, version and entry count before translation. `--source server-pak --server-pak PATH` is available for local repeatable checks. `--source installed-game` is a developer fallback. `tools/pakv12.py` validates footer/index SHA-1, full directory exact lookup, compact entries, local headers and Oodle blocks. It uses a reusable local **ooz DLL through ctypes**, prepared once by bootstrap. No proprietary Oodle DLL or installed game is required. repak v0.2.3 writes V11 with mount `../../../`; build verifies list/info/unpack and compares all extracted LOCRES bytes with the rebuilt input. Every correction is checked against stock EN/RU keys, exact placeholders and RichText structure before serialization. The production build fails unless the final PAK matches the pinned v1 size and SHA-256; details are recorded in ignored `work/build_validation.json`.
-
-Scope: ASA's current **unencrypted PAK V12**, compact entries, None/Oodle compression. Unsupported versions, encrypted index/payload, missing exact paths, unknown compression and malformed ranges fail explicitly. Metadata and each extracted resource are capped at 64 MiB. Future storage-format changes may require reader updates; no silent alternative extractor exists. Use trusted installed game content: upstream ooz is not fuzz safe.
-
-## Bootstrap cache
-
-Artifacts, pinned source and licenses stay in ignored `work/tools/`. repak v0.2.3 and DepotDownloader 3.4.0 release archives, plus every ooz source file, have pinned SHA-256. Bootstrap reuses verified downloads, restores tools from their cached archives if needed, and reuses ooz only when its source/build recipe and recorded DLL hash match. It does not download or compile on every run. Delete `work/tools/ooz/build.json` to rebuild from pinned source.
-
-## Manual cloud build
-
-The GitHub Actions workflow [cloud-build.yml](.github/workflows/cloud-build.yml) is triggered only by `workflow_dispatch`. It runs on `windows-latest` with Python 3.12, bootstraps pinned tools, downloads only the required server PAK from the pinned manifest, runs the production build and full tests, then uploads `ASA_RU_Fix_P.pak`, `cloud-build-report.json` and a compact validation log as `asa-ru-fix-cloud-build` for three days. It does not publish releases or change repository contents. Build pins, input hashes and local/cloud verification notes are in [docs/cloud-build.md](docs/cloud-build.md) and [TESTING.md](TESTING.md). Start it from the repository's Actions tab when a cloud verification is needed.
-
-## Corrections
-
-Edit `data/corrections.json`: JSON `namespace\tkey` -> replacement Russian text. Every key must exist in current official RU LOCRES. Only explicit translations are stored in Git; the complete rebuilt resources are generated in ignored `work/`.
-
-Follow the Russian UI sentence case rules in [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md). The first correction fixes the mode selection screen's Back button: official `спина` -> `Назад`, with an uppercase first letter even though the EN source is `back`. Its in-game end-to-end test passed, as reported by the user in [TESTING.md](TESTING.md). `data/additions.json` stores explicitly reviewed EN-only ShooterGame keys. Build copies their EN namespace/key/source hashes and inserts them in native EN order into the stock RU base, then rebuilds string tables/refcounts. Keys already present in RU, unknown EN keys or incompatible stock order fail explicitly. Review English changes with `python delta.py OLD_EN.json NEW_EN.json`.
-
-The current **FINAL V1** contains 1200 corrections, 43 ShooterGame additions and 21 Engine edits. Batch 33 distinguishes equipment slots: LEGS remains «Ноги» and FEET is «Ступни». The artifact passed production build, repak info/list/unpack, repeated LOCRES validation and all 67 original tests. See [V1_CANDIDATE.md](V1_CANDIDATE.md) for artifact details, verification and known limitations.
-
-`data/engine_ru.json` contains only confirmed `InputKeys` identities. Engine EN/RU resources are freshly extracted from the same installed V12 PAK. Existing RU keys are corrected; an explicitly requested EN-only key is inserted by the same safe merge. Production packs both Engine RU and ShooterGame RU LOCRES, then reopens both and verifies every translation and byte. `Tilde` has no confirmed InputKeys entry in the current resources and is not guessed.
-
-Targeted widget research found collected FText for `WEIGHT` and `Crafting Requirements`, but no proven orphan identity explaining the reported English UI instances. Fresh source-hash checks also confirmed matching EN/RU/asset hashes for both strings, so no source-hash synchronization is needed. No orphan entries are generated. Research tools/assets remain in ignored `work/` and are not production dependencies.
-
-Final cleanup imported only batches 29/30: five new corrections, two authorized Hide Hat revisions to `Кожаная шапка`, and one exact SHOW BUFFS duplicate. Companion Speed Booster is `Усилитель скорости компаньона`. Ten root review CSV/JSON files were archived byte-for-byte under ignored `work/review/archive-2026-09-30/`; the root is clear of review artifacts. The project status is FINAL V1; an optional [manual smoke-test](V1_CANDIDATE.md#manual-smoke-test-plan) is documented for the user. WEIGHT/Crafting Requirements remain documented limitations and do not count as a v1 smoke-test failure.
-
-Историческая сверка после обновления ARK перенесла `GraphLiteral\t2415568346` (`Teleport Destination`) из additions в corrections: ключ появился в stock RU с другим переводом. Этот перенос предшествовал Batch 32/33; актуальные totals FINAL V1 приведены выше. Сверка сохранена в ignored `work/review/update_reconciliation.json`.
-
-For future reviewed candidates, first run the production build to refresh the stock dumps, then run `python -m tools.corrections --candidate PATH_TO_CUMULATIVE.json` for a dry-run preflight. `--expected-new` and `--expected-total` can enforce batch counts; `--apply` writes a sorted UTF-8 corrections file only after validation succeeds. Conflicting existing values, duplicate JSON keys, missing official keys, empty replacements, changed placeholders and damaged RichText fail explicitly. Rebuild with `python build.py` after importing.
-
-## Deterministic translation audit
-
-After a build refreshes official `work/en.json` and `work/ru.json`, run:
+Для текущей публичной версии сначала получите точный manifest:
 
 ```powershell
-python tools/audit.py
+python tools/bootstrap.py --probe-only
+python -m tools.manifest_probe --output work/manifest-probe.json
+python tools/bootstrap.py
+# Подставьте manifest_id из полученного JSON.
+python build.py --profile live --manifest ID
 ```
 
-The standard-library script deterministically exports `audit/all_strings.csv`, `audit/suspicious.csv`, separate missing-key and grouped consistency CSVs, and `audit/summary.json`. CSVs use UTF-8 with BOM and proper quoting. The audit uses mechanical filters only: it uses no AI, does not judge translation quality, and never edits translations or corrections. It always reads **stock** `work/en.json` and `work/ru.json`; `our_ru` and `already_corrected` expose project corrections separately, without masking official errors. It never reads patched `work/ru_rebuilt.json`. Generated `audit/` files are gitignored.
+`--probe-only` готовит только DepotDownloader. Probe получает метаданные manifest без файлов depot и без PAK. Полный bootstrap нужен при переходе к сборке. Профиль `live` проверяет структуру текущих ресурсов, формат переводов и сохранность принятых EN-identity; размер и общий SHA-256 ресурсов могут отличаться от pinned. Его результат не обязан совпадать с pinned PAK.
 
-`python -m unittest discover -s tests -v` includes focused audit fixtures for CSV quoting, placeholders, markup, missing keys, repeated source/translation, known terms and corrections.
+Для повторной локальной проверки доступны `--source server-pak --server-pak PATH` и явный `--output PATH`. `--source installed-game --game-path PATH` оставлен для разработки. Команды, параметры облачных workflow и ограничения расписания приведены в [docs/cloud-build.md](docs/cloud-build.md). Фактические результаты проверок записываются в [TESTING.md](TESTING.md) и [V1_CANDIDATE.md](V1_CANDIDATE.md); описание процесса не заменяет подтверждённый запуск.
 
-## Optional validation
+## Данные перевода и защита исходных строк
+
+`data/shootergame_ru.json` — единственный набор желаемых ShooterGame-переводов: JSON `namespace\tkey` → русский текст. Он содержит точное объединение прежних 1200 corrections и 43 additions, всего **1243 уникальных ключа**, с сохранением текстов. `data/engine_ru.json` сохраняет **21** подтверждённый перевод `InputKeys`. Отдельные файлы corrections/additions удалены.
+
+Классификация выполняется для текущего stock RU: отсутствующий ключ становится добавлением; существующий с другим текстом — исправлением; совпадающий с желаемым текстом — `already_correct`. На pinned manifest получаются:
+
+| Ресурс | Исправления | Добавления | Уже правильные | Всего желаемых |
+| --- | ---: | ---: | ---: | ---: |
+| ShooterGame | 1199 | 43 | 1 | 1243 |
+| Engine | 16 | 1 | 4 | 21 |
+
+Эти значения отличаются от исторического количества записанных правок: одна ShooterGame-строка и четыре Engine-строки уже совпадают со stock RU. Это не потеря переводов. В `live` доли категорий могут меняться, а все желаемые строки проверяются после сборки и извлечения из PAK.
+
+`data/source_identity.json` имеет schema `1`, исходный `manifest_id` и карты ресурсов `ShooterGame`/`Engine`. Для каждого желаемого ключа сохранены три числовых поля: `namespace_hash`, `key_hash`, `source_hash`. Официальные EN-тексты в baseline не записываются. Исчезновение нужного EN-ключа, отсутствие принятой identity или изменение любого из трёх хэшей останавливает сборку. Изменения посторонних EN-ключей разрешены.
+
+Перед переводом проверяются непустые ключи и значения, точные плейсхолдеры, printf и RichText. При добавлении ключа используются его EN-хэши и положение в исходном EN-ресурсе. Для уже существующих RU-ключей сохраняется stock RU `source_hash`: автоматической синхронизации с EN нет.
+
+Изменение EN-identity принимается только для явно названных желаемых ключей. Сначала просмотрите вывод без `--apply`, затем повторите команду с `--apply`, если новая исходная строка проверена:
 
 ```powershell
+python -m tools.translation_data accept-source --resource ShooterGame --stock-en work/source/ShooterGame/Content/Localization/ShooterGame/en/ShooterGame.locres --key "Content`t3027221575"
+# Добавьте --apply после проверки old/new хэшей.
+```
+
+В PowerShell `` `t `` обозначает настоящий TAB внутри ключа. `--key` повторяется для каждого проверенного ключа; массового принятия всех identity нет. Для Engine используйте `--resource Engine` и соответствующий stock EN LOCRES. Команда показывает old/new хэши и меняет только названные записи baseline.
+
+Проверенные кандидаты импортируются существующим CLI:
+
+```powershell
+python -m tools.corrections --candidate PATH_TO_REVIEWED.json
+# --expected-new N и --expected-total N позволяют проверить размер импорта.
+# --apply записывает объединённый data/shootergame_ru.json.
+```
+
+Кандидат может содержать EN-only ключ. Новый желаемый ключ требует отдельного `accept-source`: импорт не принимает identity автоматически, а выводит `pending_source_acceptance`. До принятия таких ключей сборка остановится. Конфликты существующих текстов, дубли JSON-ключей, отсутствие EN, пустые значения и нарушения форматирования отклоняются. Правила русских UI-текстов описаны в [TRANSLATION_STYLE.md](TRANSLATION_STYLE.md); сравнение EN-дампов доступно через `python delta.py OLD_EN.json NEW_EN.json`.
+
+## Облачное обновление
+
+[cloud-build-pinned.yml](.github/workflows/cloud-build-pinned.yml) выполняет ручную проверку закреплённого эталона и сохраняет артефакты. [auto-update.yml](.github/workflows/auto-update.yml) предназначен для проверки текущего публичного manifest и публикации через `gh`: версионный GitHub Release содержит PAK, а ветка `channel` хранит `stable.json` и `automation.json`.
+
+Решение о сборке зависит от пары `(manifest_id, build_fingerprint)`. Уже успешно обработанная пара пропускается. После двух ошибок одной пары дальнейшие автоматические сборки блокируются до изменения входов либо ручного `force_rebuild`. Patch-компонент версии повышается только при изменении байтов PAK; новый manifest с прежним PAK обновляет сведения об успешной обработке без новой версии.
+
+Расписание `17,47 * * * *` подготовлено для запуска дважды в час и включается только после реального PASS серверной проверки. До такого подтверждения используется ручной запуск. `GITHUB_TOKEN` workflow требует `contents: write`; группа concurrency `asa-ru-fix-live-update` использует `cancel-in-progress: false`. Подробности публикации, состояния и восстановления приведены в [документации облачного процесса](docs/cloud-build.md#автоматическое-обновление-и-публикация).
+
+Цель будущего клиента — получать небольшой PAK, ориентировочно 11 MB, по проверяемому `stable.json`, вместо локального извлечения ресурсов игры. Сам клиент и Steam-launch относятся к следующему этапу.
+
+## Аудит и проверки
+
+После обновления stock-дампов сборкой:
+
+```powershell
+python -m tools.audit
 python -m unittest discover -s tests -v
 python tests/standalone_build.py
 ```
 
-The second command reruns the complete production build from the already downloaded server PAK with filesystem, DLL, import and process guards; only cached repak may run. Set `ASA_TEST_SERVER_PAK` to use a server PAK from another cache location. `tests/compare_devkit.py --unrealpak PATH_TO_REFERENCE_TOOL` is a historical optional development oracle comparison, never imported by production and not needed for this pipeline. Recorded results: [TESTING.md](TESTING.md).
+Аудит читает официальные `work/en.json` и `work/ru.json`. Желаемые тексты из `data/shootergame_ru.json` показываются отдельно в `our_ru`/`already_corrected` и не скрывают ошибки stock RU. `work/ru_rebuilt.json` не используется. CSV имеют UTF-8 BOM и корректное экранирование; отчёты `audit/` игнорируются Git. Механические фильтры не оценивают смысл и качество перевода и не редактируют данные.
 
-## Install / uninstall later
+Standalone-проверка использует уже загруженный server PAK и ограничивает файловые, DLL- и process-зависимости; допускается только кэшированный repak. Для другого расположения кэша задайте `ASA_TEST_SERVER_PAK`. Историческая `tests/compare_devkit.py --unrealpak PATH` — дополнительная проверка разработчика, не зависимость production.
 
-When you choose to install, preview with `./install.ps1 -WhatIf`, then run `./install.ps1`. It copies/replaces only `ASA_RU_Fix_P.pak`. Preview removal with `./uninstall.ps1 -WhatIf`; `./uninstall.ps1` removes only that patch. Game launch is separate. Future corrections need manual context checks; server/anti-cheat compatibility is not established by the verified Back button fix.
+## Формат ресурсов, кэш и ограничения
 
-## Third-party components
+Читатель поддерживает незашифрованный PAK V12, compact entries и None/Oodle. Он проверяет footer/index SHA-1, точные пути, локальные заголовки, диапазоны и блоки сжатия. Метаданные и каждый извлекаемый ресурс ограничены 64 MiB. Неизвестные версии, шифрование, неизвестное сжатие и повреждённые данные отклоняются. ooz загружается один раз через ctypes; проприетарная Oodle DLL не нужна. Upstream ooz не рассчитан на враждебные входные потоки; используйте доверенный официальный контент.
 
-- [repak](https://github.com/trumank/repak), **v0.2.3**, **MIT OR Apache-2.0**: official Windows x64 release, SHA-256 pinned; existing patch writer preserved.
-- [powzix/ooz](https://github.com/powzix/ooz/tree/05038060aa68f9187ae9923b2388ca8db40e58d1), commit **05038060aa68f9187ae9923b2388ca8db40e58d1**, **GPL-3.0-or-later**: bootstrap compiles its decoder with our GPL C ABI bridge. Source, full license and DLL remain cache artifacts.
-- [TradFR](https://github.com/valentin-gosselin/ark-ascended-fr) was studied as a format reference. No explicit project license was found at the inspected commit; no source was copied verbatim.
+repak v0.2.3 создаёт V11 с mount `../../../`. Пакет содержит только два русских LOCRES; проверяются `info`, `list`, `unpack`, байты повторно извлечённых файлов и каждый желаемый перевод. Отчёт сборки находится в игнорируемом `work/build_validation.json`.
 
-Provenance, license evidence and compilation details: [THIRD_PARTY.md](THIRD_PARTY.md).
+Инструменты, исходники и лицензии хранятся в `work/tools/`. Архивы repak/DepotDownloader и исходники ooz закреплены SHA-256. Bootstrap повторно использует проверенный кэш, восстанавливает файлы из архивов и принимает DLL только при совпадении recipe и записанного хэша. Для пересборки ooz удалите его `work/tools/ooz/build.json`.
+
+Английские UI-случаи `WEIGHT` и `Crafting Requirements` остаются известными ограничениями: исследование не подтвердило отдельную orphan identity, которую можно безопасно добавить. Производственная сборка не создаёт предполагаемые ключи. Переводы модов исключены из текущей области; исследовательские инструменты и игровые assets остаются в игнорируемом `work/`.
+
+## Ручная установка и удаление
+
+Когда нужна установка, сначала выполните `./install.ps1 -WhatIf`, затем `./install.ps1`. Скрипт копирует только `ASA_RU_Fix_P.pak`. Для удаления используйте `./uninstall.ps1 -WhatIf`, затем `./uninstall.ps1`; удаляется только этот PAK. Запуск игры выполняется отдельно. Совместимость с сервером и anti-cheat не устанавливается одной проверкой кнопки «Назад».
+
+## Сторонние компоненты
+
+- [repak](https://github.com/trumank/repak), v0.2.3, **MIT OR Apache-2.0**: проверенный Windows x64 архив, запись и проверка патча.
+- [DepotDownloader](https://github.com/SteamRE/DepotDownloader), v3.4.0, **GPL-2.0**: анонимный доступ к manifest и выбранному server PAK; архив и лицензия остаются в кэше.
+- [powzix/ooz](https://github.com/powzix/ooz/tree/05038060aa68f9187ae9923b2388ca8db40e58d1), commit `05038060aa68f9187ae9923b2388ca8db40e58d1`, **GPL-3.0-or-later**: локально компилируемый декодер и GPL C ABI bridge. При отдельном распространении производного ooz сохраняйте соответствующие исходники, уведомления и лицензию.
+- [TradFR](https://github.com/valentin-gosselin/ark-ascended-fr) изучался как технический пример формата. На исследованном commit явная лицензия проекта не найдена; исходники не копировались дословно.
+
+Происхождение, лицензии и детали компиляции описаны в [THIRD_PARTY.md](THIRD_PARTY.md).

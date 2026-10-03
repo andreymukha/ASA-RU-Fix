@@ -114,7 +114,7 @@ class DeterministicOutputTests(unittest.TestCase):
                        "depot_id": "2430931", "manifest": PINNED_MANIFEST,
                        "downloaded_bytes": 12},
             "stock_input_validation": {name: {"status": "PASS"} for name in PINNED_STOCK},
-            "counts": {"corrections": 1200, "additions": 43, "engine_edits": 21},
+            "counts": {"shooter_desired": 1243, "engine_desired": 21},
             "translation_validation": {"status": "PASS", "issues": 0},
             "package": {"list_info_unpack": "PASS"},
             "pak_size": 10_795_036,

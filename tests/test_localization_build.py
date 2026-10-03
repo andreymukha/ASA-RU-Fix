@@ -109,7 +109,7 @@ class LocalizationBuildTests(unittest.TestCase):
                                {INTERNAL: data}, {INTERNAL: {'Content\ta': 'Wrong'}})
 
     def test_reviewed_screenshot_regressions(self):
-        edits = load_edits(Path(__file__).resolve().parents[1] / 'data/corrections.json')
+        edits = load_edits(Path(__file__).resolve().parents[1] / 'data/shootergame_ru.json')
         expected = {'Content\t1408111756': 'Назад',
                     'GraphLiteral\t1014074791': 'Цвет прицела на союзнике',
                     'GraphLiteral\t3145492015': 'Цвет прицела на враге',
@@ -129,15 +129,13 @@ class LocalizationBuildTests(unittest.TestCase):
                          'Content\t4053904995': 'Усилитель скорости компаньона',
                          'GraphLiteral\t397870435': 'Показать эффекты',
                          'GraphLiteral\t2415568346': 'Точка назначения телепорта'})
-        self.assertEqual(len(edits), 1200)
+        self.assertEqual(len(edits), 1243)
         self.assertEqual({key: edits[key] for key in expected}, expected)
         self.assertNotIn('GraphLiteral\t63761803', edits)
         self.assertFalse(any('RU FIX TEST' in value for value in edits.values()))
-        additions = load_edits(Path(__file__).resolve().parents[1] / 'data/additions.json')
-        self.assertEqual(len(additions), 43)
-        self.assertEqual(additions['GraphLiteral\t1863176983'], ', ВЕТЕР:')
-        self.assertEqual(additions['GraphLiteral\t3285020872'], 'КАРТЫ ИЗ МОДОВ')
-        self.assertEqual(additions['Content\t1664294528'], 'Седло для Лиоплевродона')
+        self.assertEqual(edits['GraphLiteral\t1863176983'], ', ВЕТЕР:')
+        self.assertEqual(edits['GraphLiteral\t3285020872'], 'КАРТЫ ИЗ МОДОВ')
+        self.assertEqual(edits['Content\t1664294528'], 'Седло для Лиоплевродона')
         for key, value in {
             'Content\t1085241693': 'Седло для Акрокантозавра',
             'Content\t1478860490': 'Седло для Мегараптора',
@@ -155,7 +153,7 @@ class LocalizationBuildTests(unittest.TestCase):
         self.assertEqual(edits['GraphLiteral\t1576228423'], 'Ступни')
 
     def test_ordinary_saddle_name_style_regressions(self):
-        edits = load_edits(Path(__file__).resolve().parents[1] / 'data/corrections.json')
+        edits = load_edits(Path(__file__).resolve().parents[1] / 'data/shootergame_ru.json')
         for key, value in {
             'Content\t1478860490': 'Седло для Мегараптора',
             'Content\t3497981399': 'Седло для Бизона',
