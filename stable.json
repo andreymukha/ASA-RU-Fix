@@ -1,0 +1,58 @@
+{
+  "artifact": {
+    "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/v1.0.0/ASA_RU_Fix_P.pak",
+    "filename": "ASA_RU_Fix_P.pak",
+    "sha256": "914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b",
+    "size": 10795036
+  },
+  "build": {
+    "engine_desired": 21,
+    "fingerprint": null,
+    "initial_baseline": "proven-cloud-artifact",
+    "shooter_desired": 1243
+  },
+  "channel": "stable",
+  "release": {
+    "commit": "d675366eed03434cdc762b4e2baf3a180e909515",
+    "published_at": "2026-10-03T04:18:34Z",
+    "tag": "v1.0.0"
+  },
+  "schema": 1,
+  "source": {
+    "checked_at": "2026-10-03T03:09:44.515652Z",
+    "depot_id": "2430931",
+    "manifest_id": "3251368963427721326",
+    "steam_app_id": "2430930",
+    "stock_locres": {
+      "Engine EN": {
+        "entries": 48284,
+        "sha256": "c0ae7e3dc9fb0f38ab39064f4556737c7ebf3a7ed8bd3971dd6dd0912ddf2d30",
+        "size": 3909182,
+        "status": "PASS",
+        "version": 3
+      },
+      "Engine RU": {
+        "entries": 45771,
+        "sha256": "4e9e6bc08b577c947ec67bc1168633916f464d45ce973c8a5f6de54159a9d475",
+        "size": 5805962,
+        "status": "PASS",
+        "version": 3
+      },
+      "ShooterGame EN": {
+        "entries": 39444,
+        "sha256": "efb6606905da0c3b5883c2472b253db5e22f5cd2e948cb0d1601b565ce41a216",
+        "size": 3669617,
+        "status": "PASS",
+        "version": 3
+      },
+      "ShooterGame RU": {
+        "entries": 35598,
+        "sha256": "be8b5d46901bc3780be0454dbc9545908cdb35b6cc59cd5dd48315d9887a1d44",
+        "size": 4996378,
+        "status": "PASS",
+        "version": 3
+      }
+    }
+  },
+  "version": "1.0.0"
+}
