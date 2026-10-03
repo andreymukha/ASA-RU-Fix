@@ -81,12 +81,13 @@ class ReleaseRecoveryTests(unittest.TestCase):
         }
         return copy.deepcopy(self.published_metadata)
 
-    def _run(self, *, run_id='first-run', commit=FIRST_COMMIT, timestamp='first-time'):
-        probe = {'app_id': '2430930', 'depot_id': '2430931', 'manifest_id': '123', 'checked_at': timestamp}
+    def _run(self, *, run_id='first-run', commit=FIRST_COMMIT, timestamp='first-time',
+             manifest='123', changed=True):
+        probe = {'app_id': '2430930', 'depot_id': '2430931', 'manifest_id': manifest, 'checked_at': timestamp}
         report = {
             'timestamp_utc': timestamp, 'run_id': run_id, 'git_commit': commit,
             'steam': probe, 'source': {'pak_size': 123, 'pak_sha256': 'e' * 64},
-            'stock_locres': {}, 'build_fingerprint': FINGERPRINT, 'pak_changed': True,
+            'stock_locres': {}, 'build_fingerprint': FINGERPRINT, 'pak_changed': changed,
             'final_pak': {'path': updater.PAK_NAME, 'size': len(self.raw_pak), 'sha256': self.digest},
         }
         with patch.object(updater, 'build_fingerprint', return_value=FINGERPRINT), \
@@ -147,6 +148,19 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(self.channel.state['last_attempt']['failure_count'], 0)
         self.assertEqual(self.channel.state['last_attempt']['attempt_count'], 2)
         self.assertEqual(self.channel.writes[-1][2], 'Record verified Steam localization build')
+
+    def test_new_manifest_unchanged_pak_cannot_discard_existing_pending_transaction(self):
+        self.fail_partial_upload = True
+        self.assertEqual(self._run()[0], 2)
+        original_pending = copy.deepcopy(self.channel.state['pending_release'])
+        result, report = self._run(run_id='new-manifest', timestamp='next-time', manifest='124', changed=False)
+        self.assertEqual(result, 2)
+        self.assertEqual(self.channel.state['pending_release'], original_pending)
+        self.assertEqual(self.channel.stable, self.initial_stable)
+        self.assertEqual(len(self.publications), 1)
+        self.assertEqual(self.channel.state['last_attempt']['failure_count'], 1)
+        self.assertEqual(self.channel.state['last_attempt']['manifest_id'], '124')
+        self.assertEqual(report['status'], 'failed')
 
 
 if __name__ == '__main__':

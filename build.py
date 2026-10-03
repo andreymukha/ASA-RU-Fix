@@ -178,6 +178,7 @@ def main() -> int:
         parser.error('live profile requires an exact numeric --manifest from the probe')
     (ROOT / 'work').mkdir(parents=True, exist_ok=True)
     (ROOT / 'work/build_failure.json').unlink(missing_ok=True)
+    (ROOT / 'work/build_progress.json').unlink(missing_ok=True)
     repak = resolve_repak(args.repak, parser)
     source_pak, source_report = resolve_source(args, parser)
     source_report['manifest'] = args.manifest
@@ -193,6 +194,9 @@ def main() -> int:
     for name, spec in PINNED_STOCK.items():
         stock_bytes[name] = reader.extract(spec.relative_path)
     stock_validation = validate_stock_resources(stock_bytes, profile=args.profile)
+    (work / 'build_progress.json').write_text(json.dumps({
+        'profile': args.profile, 'source': source_report, 'stock_locres': stock_validation,
+    }, indent=2) + '\n', encoding='utf-8')
     identities = load_source_identity(ROOT / 'data/source_identity.json')
     for name, internal, desired_file in (
         ('ShooterGame', INTERNAL, 'shootergame_ru.json'),
@@ -300,8 +304,10 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except (OSError, LocresError, RuntimeError) as exc:
         (ROOT / 'work').mkdir(parents=True, exist_ok=True)
+        progress = ROOT / 'work/build_progress.json'
+        context = json.loads(progress.read_text(encoding='utf-8')) if progress.is_file() else {}
         (ROOT / 'work/build_failure.json').write_text(json.dumps(
-            {'status': 'FAIL', 'error': str(exc), 'issues': getattr(exc, 'issues', [])},
+            {**context, 'status': 'FAIL', 'error': str(exc), 'issues': getattr(exc, 'issues', [])},
             ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         print(f"BUILD ERROR: {exc}", file=sys.stderr)
         raise SystemExit(2)

@@ -230,7 +230,16 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
             report['published_release'] = published
         failure = work / 'build_failure.json'
         if report['heavy_build'] and failure.is_file():
-            report['validation_failure'] = read_json(failure)
+            detail = read_json(failure)
+            report['validation_failure'] = detail
+            if 'source' in detail:
+                report['source'] = detail['source']
+                report['downloaded_bytes'] = detail['source'].get('downloaded_bytes', 0)
+            if 'stock_locres' in detail:
+                report['stock_locres'] = detail['stock_locres']
+            issues = detail.get('issues', [])
+            report['missing'] = sum(item.get('kind') == 'missing_en_key' for item in issues)
+            report['source_changed'] = sum(item.get('kind') == 'source_changed' for item in issues)
         if probe is not None:
             failed = record_failure(state, probe['manifest_id'], fingerprint, run_id, str(exc), utc_now())
             try:

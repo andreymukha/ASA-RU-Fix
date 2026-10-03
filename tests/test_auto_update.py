@@ -29,7 +29,7 @@ def full_report(changed=False):
 
 
 class AutomationTests(unittest.TestCase):
-    def exercise(self, state=None, *, changed=False, fail=None, force=False, probe_fail=False):
+    def exercise(self, state=None, *, changed=False, fail=None, force=False, probe_fail=False, failure_context=None):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             publisher = Mock()
@@ -40,13 +40,15 @@ class AutomationTests(unittest.TestCase):
             probe = full_report()['steam']
             def execute(*args):
                 if fail and 'build.py' in args:
+                    if failure_context:
+                        updater.write_json(root / 'work/build_failure.json', failure_context)
                     raise RuntimeError('injected build failure')
             with patch.object(updater, 'build_fingerprint', return_value=FP), \
                  patch.object(updater.subprocess, 'check_output', return_value='c' * 40), \
                  patch.object(updater, 'execute', side_effect=execute) as commands, \
                  patch.object(updater, 'probe_manifest', side_effect=RuntimeError('probe') if probe_fail else None, return_value=probe), \
                  patch.object(updater, 'run_tests', return_value={'result': 'PASS', 'count': 123}) as tests, \
-                 patch.object(updater, 'read_json', return_value={}), \
+                 patch.object(updater, 'read_json', return_value=failure_context or {}), \
                  patch.object(updater, 'make_live_report', return_value=full_report(changed)), \
                  patch.object(updater, 'stage_release', return_value=[]) as stage:
                 code = updater.run_update(root, REPO, publisher, force=force, run_id='42')
@@ -111,6 +113,18 @@ class AutomationTests(unittest.TestCase):
         value = stable(); value['artifact']['download_url'] = 'https://example.org/latest'
         with self.assertRaises(ValueError):
             updater.validate_channel(value, {'schema': 1}, REPO)
+
+    def test_source_guard_failure_preserves_real_download_metadata(self):
+        detail = {'source': {'downloaded_bytes': 100, 'pak_size': 200}, 'stock_locres': {'ShooterGame EN': {}},
+                  'issues': [{'kind': 'source_changed', 'resource': 'ShooterGame',
+                              'full_key': 'Content\t123', 'old_source_hash': 1, 'current_source_hash': 2}]}
+        code, report, pub, cmd, tests, stage = self.exercise(fail=True, failure_context=detail)
+        self.assertEqual(code, 2)
+        self.assertEqual(report['downloaded_bytes'], 100)
+        self.assertEqual(report['source_changed'], 1)
+        self.assertEqual(report['validation_failure']['issues'][0]['current_source_hash'], 2)
+        self.assertEqual(pub.write_channel.call_args.args[0], stable())
+        pub.publish_release.assert_not_called()
 
 
 if __name__ == '__main__':
