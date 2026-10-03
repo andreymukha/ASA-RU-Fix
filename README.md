@@ -1,8 +1,25 @@
 # ASA RU Fix
 
-Исправления русской локализации ARK: Survival Ascended для Windows x64. Сборка получает официальные EN/RU LOCRES из Steam Dedicated Server, применяет проверенные переводы к полным RU-ресурсам и создаёт `dist/ASA_RU_Fix_P.pak`. Клиент ARK и DevKit для сборки не нужны. Официальные тексты, загруженные инструменты и созданные бинарные файлы не хранятся в Git.
+Исправления русской локализации ARK: Survival Ascended для Steam на Windows x64. Клиент `ASA-RU-Fix.exe` устанавливает готовый перевод и проверяет обновления перед обычным запуском игры через Steam.
 
-Текущая задача проекта — серверная проверка новых manifest и публикация проверенного PAK с метаданными канала. Клиентский updater, автоматическая установка обновлений и запуск игры через Steam ещё не реализованы. Исторический снимок `E:\Projects\ARK Survival\ASA-RU-Fix-legacy-v1` сохранён отдельно; его прежний launcher не является текущим клиентом нового канала обновлений.
+## Для игроков
+
+1. Скачать [ASA-RU-Fix.exe](https://github.com/andreymukha/ASA-RU-Fix/releases/download/updater-v1.0.0/ASA-RU-Fix.exe).
+2. Запустить.
+3. Нажать «Установить».
+4. Дальше запускать ARK через Steam как обычно.
+
+Поддерживается Steam-версия ARK: Survival Ascended на Windows x64. Python, Git, отдельный .NET Runtime и GitHub account не нужны. Updater устанавливается для текущего пользователя в `%LOCALAPPDATA%\ASA-RU-Fix\ASA-RU-Fix.exe`; скачанный файл после установки можно удалить самостоятельно. Когда потребуется настроить Steam, программа предложит его перезапуск. При запущенной ARK сначала закройте игру.
+
+Исходные Steam Launch Options сохраняются. Updater проверяет готовый PAK из GitHub и обновляет собственный EXE; ошибка сети или обновления позволяет запустить игру с имеющимся переводом. Telemetry, Windows service, scheduled task и автозапуск Windows отсутствуют. Для удаления используйте «Удалить» в программе или Windows Installed Apps.
+
+EXE **не подписан**: при первом запуске Windows может показать SmartScreen warning. Программа не устанавливает доверенные сертификаты и не меняет настройки защиты Windows. Подробности установки, восстановления и удаления — в [документации клиента](docs/client-updater.md). Подтверждённые локальные проверки и статус первой публикации приведены в [TESTING.md](TESTING.md).
+
+## Для разработчиков
+
+Серверная сборка получает официальные EN/RU LOCRES из Steam Dedicated Server, применяет проверенные переводы к полным RU-ресурсам и создаёт `dist/ASA_RU_Fix_P.pak`. Клиент загружает уже готовый PAK: server depot, repak, ooz и DevKit на компьютере игрока не используются. Официальные тексты, загруженные инструменты и созданные бинарные файлы не хранятся в Git.
+
+Исходники клиента находятся в `client/`; сборка использует закреплённый .NET 10 LTS SDK `10.0.401` и runtime `10.0.12`. Команды сборки, fixture tests и manual workflow описаны в [docs/client-updater.md](docs/client-updater.md#сборка-и-публикация). Python/PowerShell/VBS инструменты проекта предназначены для разработки и серверной сборки. Исторический снимок `E:\Projects\ARK Survival\ASA-RU-Fix-legacy-v1` сохранён отдельно.
 
 ## Сборка
 
@@ -75,9 +92,9 @@ python -m tools.corrections --candidate PATH_TO_REVIEWED.json
 
 Расписание **`17,47 * * * *` включено** после успешных hosted pinned/live и fast-path проверок. `GITHUB_TOKEN` workflow требует только `contents: write`; группа concurrency `asa-ru-fix-live-update` использует `cancel-in-progress: false`. Подробности публикации, состояния и восстановления приведены в [документации облачного процесса](docs/cloud-build.md#автоматическое-обновление-и-публикация), фактические результаты — в [отчёте проверки](docs/server-automation-verification.md).
 
-Публичный канал для будущего updater: [stable.json](https://raw.githubusercontent.com/andreymukha/ASA-RU-Fix/channel/stable.json). Готовый PAK опубликован в [Release v1.0.0](https://github.com/andreymukha/ASA-RU-Fix/releases/tag/v1.0.0). Клиентская доставка на этом этапе ещё не реализована.
+Публичный канал перевода: [stable.json](https://raw.githubusercontent.com/andreymukha/ASA-RU-Fix/channel/stable.json). Готовый PAK опубликован в [Release v1.0.0](https://github.com/andreymukha/ASA-RU-Fix/releases/tag/v1.0.0). Клиент использует этот manifest для загрузки и проверки PAK; канал самого updater — [client.json](https://raw.githubusercontent.com/andreymukha/ASA-RU-Fix/channel/client.json). Версии перевода и updater независимы.
 
-Цель будущего клиента — получать небольшой PAK, ориентировочно 11 MB, по проверяемому `stable.json`, вместо локального извлечения ресурсов игры. Сам клиент и Steam-launch относятся к следующему этапу.
+Первый PAK занимает `10795036` bytes. Перед игрой клиент получает небольшие manifest и скачивает PAK только при необходимости. Источник истины — каналы schema `1`, а не GitHub Latest Release.
 
 ## Аудит и проверки
 
@@ -103,9 +120,9 @@ repak v0.2.3 создаёт V11 с mount `../../../`. Пакет содержи�
 
 Английские UI-случаи `WEIGHT` и `Crafting Requirements` остаются известными ограничениями: исследование не подтвердило отдельную orphan identity, которую можно безопасно добавить. Производственная сборка не создаёт предполагаемые ключи. Переводы модов исключены из текущей области; исследовательские инструменты и игровые assets остаются в игнорируемом `work/`.
 
-## Ручная установка и удаление
+## Ручная установка и удаление для разработчика
 
-Когда нужна установка, сначала выполните `./install.ps1 -WhatIf`, затем `./install.ps1`. Скрипт копирует только `ASA_RU_Fix_P.pak`. Для удаления используйте `./uninstall.ps1 -WhatIf`, затем `./uninstall.ps1`; удаляется только этот PAK. Запуск игры выполняется отдельно. Совместимость с сервером и anti-cheat не устанавливается одной проверкой кнопки «Назад».
+Для отдельной проверки PAK сначала выполните `./install.ps1 -WhatIf`, затем `./install.ps1`. Скрипт копирует только `ASA_RU_Fix_P.pak`. Для удаления используйте `./uninstall.ps1 -WhatIf`, затем `./uninstall.ps1`; удаляется только этот PAK. Эти скрипты не устанавливают клиент и его Steam wrapper. Обычная инструкция игрока приведена в начале README. Совместимость с сервером и anti-cheat не устанавливается одной проверкой кнопки «Назад».
 
 ## Сторонние компоненты
 

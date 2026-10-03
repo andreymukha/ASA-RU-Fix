@@ -1,8 +1,22 @@
 # Проверки проекта
 
+## Клиентский updater — 2026-10-03
+
+Клиентский код, single-file publish и manual workflow добавлены отдельно от production server pipeline. Подтверждённые результаты на момент этой записи:
+
+- Полный локальный Python suite: **185 PASS**, включая 17 новых проверок client release/workflow/channel preservation. Проверки GitHub выполняются через подставной `gh`, реальные Releases в fixture tests не создаются.
+- Полный локальный .NET suite: **106/106 PASS**, 0 пропусков, включая fixture install/repair/uninstall и тестовый дочерний процесс; WinForms single-file publish — PASS без предупреждений.
+- Regression Git tree overlays подтверждает byte-identical сохранение `client.json` и неизвестного бинарного файла при серверном state update. Обратный client update сохраняет `stable.json`, `automation.json` и остальные файлы.
+- Release fixtures проверяют неверную версию, совпадение source commit, immutable tag/assets, повторный выпуск без мутаций, возобновление draft, SHA downloaded EXE и отказ от channel update после ошибки публикации.
+- Оба client workflow YAML разобраны локально; `git diff --check` новых workflow/Python файлов — PASS. Это не результат реального Actions run.
+
+Реальные `client-build` / `client-release` runs, первый `updater-v1.0.0`, публичный EXE download без токена и `--diagnose-json` именно из Release **ещё не зафиксированы в этом отчёте**. Ссылки, run ID, размер и SHA EXE добавляются после выполнения этих проверок. Локальные fixtures не заменяют CI и проверку опубликованного бинарного файла.
+
+Реальная установка, изменение Steam `localconfig.vdf`, автоматический перезапуск Steam, замена игрового PAK требуют отдельного согласия пользователя; запуск ARK в этой задаче запрещён и не относятся к автоматическим fixture tests. Успешный read-only diagnostic также не означает успешную установку. Технические команды и ручной сценарий проверки приведены в [документации клиента](docs/client-updater.md#проверки).
+
 ## Серверная автоматизация — 2026-10-03
 
-Серверный pipeline и публичный stable channel готовы; клиентская доставка ещё не реализована. Подробные исходные данные, четыре stock LOCRES, ссылки на реальные runs и состояние канала: [отчёт проверки](docs/server-automation-verification.md).
+Серверный pipeline и публичный stable channel готовы. Следующие результаты зафиксированы на серверном этапе до добавления клиента. Подробные исходные данные, четыре stock LOCRES, ссылки на реальные runs и состояние канала: [отчёт проверки](docs/server-automation-verification.md).
 
 - Pinned hosted [37096446767](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/37096446767): PASS, 168 tests, artifact скачан и побайтно совпадает с legacy.
 - Live hosted [37096442392](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/37096442392): PASS, 168 tests, manifest `3251368963427721326`, 1146602176 downloaded bytes.
@@ -16,7 +30,7 @@
 
 Русские тексты при объединении 1200 corrections + 43 additions не изменены. Единственный ShooterGame dataset содержит 1243 ключа; текущие классы 1199 corrections / 43 additions / 1 already_correct. Engine: 16 / 1 / 4, всего 21. Все 1264 EN identities проверяются; ни одно новое source identity не принимается автоматически.
 
-В этом этапе ARK/DevKit/install не запускались. Legacy snapshot, игровые файлы и клиентская доставка не изменены. Пользовательское подтверждение кнопки «Назад» сохраняется как ранее полученное in-game свидетельство; нового запуска игры не было.
+На серверном этапе ARK/DevKit/install не запускались. Legacy snapshot и игровые файлы не изменялись. Пользовательское подтверждение кнопки «Назад» сохраняется как ранее полученное in-game свидетельство; нового запуска игры не было.
 
 ## Архив предыдущих проверок
 
