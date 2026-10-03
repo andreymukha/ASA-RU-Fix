@@ -11,6 +11,7 @@
     <PackageReference Include="MSTest.TestFramework" Version="4.4.1" />
     <ProjectReference Include="../../src/AsaRuFix.Core/AsaRuFix.Core.csproj" />
     <Compile Include="../../src/AsaRuFix.App/WindowsPlatform.cs" Link="WindowsPlatform.cs" />
+    <Compile Include="../../src/AsaRuFix.App/UninstallConfirmationDialog.cs" Link="UninstallConfirmationDialog.cs" />
     <Compile Include="../../src/AsaRuFix.App/MainForm.cs" Link="MainForm.cs" />
     <Compile Include="../../src/AsaRuFix.App/AppRuntime.cs" Link="AppRuntime.cs" />
     <Compile Include="../../src/AsaRuFix.App/SelfUpdateHelper.cs" Link="SelfUpdateHelper.cs" />

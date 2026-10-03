@@ -274,23 +274,26 @@ internal sealed class MainForm : Form
             busy = false; Close(); return;
         }
         var config = store.Load() ?? throw new InvalidOperationException("Нет сохранённой интеграции для удаления.");
-        if (MessageBox.Show(this, "Удалить updater и его PAK, восстановив исходные параметры Steam?", "Удаление ASA-RU-Fix", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-        using var lease = UserMutex.TryAcquire(AppRuntime.MutexName, TimeSpan.FromSeconds(2))
-            ?? throw new InvalidOperationException("Другая операция updater уже выполняется.");
-        bool removed = false;
-        await WithSteamClosedAsync(config.SteamPath, config.GamePath, () =>
+        using var confirmation = new UninstallConfirmationDialog();
+        await UninstallConfirmationDialog.RunConfirmedAsync(confirmation.ShowDialog(this), async () =>
         {
-            // Create a verified helper BEFORE uninstalling, so a copy failure leaves the installation intact.
-            var helper = UninstallHelper.Prepare();
-            try
+            using var lease = UserMutex.TryAcquire(AppRuntime.MutexName, TimeSpan.FromSeconds(2))
+                ?? throw new InvalidOperationException("Другая операция updater уже выполняется.");
+            bool removed = false;
+            await WithSteamClosedAsync(config.SteamPath, config.GamePath, () =>
             {
-                new Uninstaller(store, platform).RemoveIntegrationAndData();
-                UninstallHelper.Start(helper);
-            }
-            catch { UninstallHelper.RemovePrepared(helper); throw; }
-            removed = true;
-            return Task.CompletedTask;
+                // Create a verified helper BEFORE uninstalling, so a copy failure leaves the installation intact.
+                var helper = UninstallHelper.Prepare();
+                try
+                {
+                    new Uninstaller(store, platform).RemoveIntegrationAndData();
+                    UninstallHelper.Start(helper);
+                }
+                catch { UninstallHelper.RemovePrepared(helper); throw; }
+                removed = true;
+                return Task.CompletedTask;
+            });
+            if (removed) { busy = false; Close(); }
         });
-        if (removed) { busy = false; Close(); }
     }
 }
