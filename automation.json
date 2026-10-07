@@ -1,12 +1,13 @@
 {
   "last_attempt": {
-    "at": "2026-10-03T04:26:04.050668Z",
+    "at": "2026-10-07T01:07:57.251294Z",
     "attempt_count": 1,
     "build_fingerprint": "72853b3027d0fbcb50ae0a997dc78c90c766cbb94c96b347971bce3823c242be",
-    "failure_count": 0,
-    "manifest_id": "3251368963427721326",
-    "run_id": "37096442392",
-    "status": "success"
+    "failure_count": 1,
+    "manifest_id": "392034836145481360",
+    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', '-m', 'tools.bootstrap')",
+    "run_id": "37555487209",
+    "status": "failed"
   },
   "last_successful": {
     "at": "2026-10-03T04:26:04.050668Z",
