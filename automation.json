@@ -1,18 +1,18 @@
 {
   "last_attempt": {
-    "at": "2026-10-07T01:23:58.246967Z",
-    "attempt_count": 2,
+    "at": "2026-10-09T19:23:50.201510Z",
+    "attempt_count": 1,
     "build_fingerprint": "72853b3027d0fbcb50ae0a997dc78c90c766cbb94c96b347971bce3823c242be",
     "failure_count": 0,
-    "manifest_id": "392034836145481360",
-    "run_id": "37556733885",
+    "manifest_id": "4836283876305884799",
+    "run_id": "37979736373",
     "status": "success"
   },
   "last_successful": {
-    "at": "2026-10-07T01:23:58.246967Z",
+    "at": "2026-10-09T19:23:50.201510Z",
     "build_fingerprint": "72853b3027d0fbcb50ae0a997dc78c90c766cbb94c96b347971bce3823c242be",
-    "manifest_id": "392034836145481360",
-    "run_id": "37556733885"
+    "manifest_id": "4836283876305884799",
+    "run_id": "37979736373"
   },
   "latest_release": {
     "sha256": "914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b",
