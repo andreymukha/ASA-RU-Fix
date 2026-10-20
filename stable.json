@@ -18,11 +18,11 @@
   },
   "schema": 1,
   "source": {
-    "checked_at": "2026-10-14T20:22:33Z",
+    "checked_at": "2026-10-20T18:22:42Z",
     "depot_id": "2430931",
-    "manifest_id": "8504586994243071689",
-    "server_pak_sha256": "fb37ee4e298346028e48e31bb8b9455eb8fdd33b2f46ef2141443df872f709e2",
-    "server_pak_size": 1487841974,
+    "manifest_id": "5862040015439121854",
+    "server_pak_sha256": "042b7ae34fd76eeba50d5f57989eb7a71dcce495fbf511ea84f8030f46491b9e",
+    "server_pak_size": 1487841978,
     "steam_app_id": "2430930",
     "stock_locres": {
       "Engine EN": {
