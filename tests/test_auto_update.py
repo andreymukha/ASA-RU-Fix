@@ -29,7 +29,7 @@ def full_report(changed=False):
 
 
 class AutomationTests(unittest.TestCase):
-    def exercise(self, state=None, *, changed=False, fail=None, force=False, probe_fail=False, failure_context=None):
+    def exercise(self, state=None, *, changed=False, fail=None, force=False, probe_fail=False, failure_context=None, now="2026-11-01T00:00:00Z", bootstrap_error=None):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             publisher = Mock()
@@ -39,14 +39,17 @@ class AutomationTests(unittest.TestCase):
                 'published_at': 'now', 'size': 12, 'sha256': 'e' * 64, 'asset_url': 'new-url'}
             probe = full_report()['steam']
             def execute(*args):
+                if bootstrap_error and '--probe-only' not in args and 'tools.bootstrap' in args:
+                    raise bootstrap_error
                 if fail and 'build.py' in args:
                     if failure_context:
                         updater.write_json(root / 'work/build_failure.json', failure_context)
-                    raise RuntimeError('injected build failure')
-            with patch.object(updater, 'build_fingerprint', return_value=FP), \
+                    raise fail if isinstance(fail, Exception) else RuntimeError('injected build failure')
+            with patch.object(updater, 'utc_now', return_value=now), \
+                 patch.object(updater, 'build_fingerprint', return_value=FP), \
                  patch.object(updater.subprocess, 'check_output', return_value='c' * 40), \
                  patch.object(updater, 'execute', side_effect=execute) as commands, \
-                 patch.object(updater, 'probe_manifest', side_effect=RuntimeError('probe') if probe_fail else None, return_value=probe), \
+                 patch.object(updater, 'probe_manifest', side_effect=(probe_fail if isinstance(probe_fail, Exception) else RuntimeError('probe')) if probe_fail else None, return_value=probe), \
                  patch.object(updater, 'run_tests', return_value={'result': 'PASS', 'count': 123}) as tests, \
                  patch.object(updater, 'read_json', return_value=failure_context or {}), \
                  patch.object(updater, 'make_live_report', return_value=full_report(changed)), \
@@ -94,10 +97,98 @@ class AutomationTests(unittest.TestCase):
     def test_blocked_pair_has_no_heavy_steps(self):
         state = {'schema': 1, 'last_attempt': {'manifest_id': '1', 'build_fingerprint': FP, 'failure_count': 2}}
         code, report, pub, cmd, tests, stage = self.exercise(state)
-        self.assertEqual(code, 2)
+        self.assertEqual(code, 0)
         self.assertEqual(cmd.call_count, 1)
         pub.write_channel.assert_not_called()
         self.assertEqual(report['status'], 'blocked')
+
+    def test_network_failures_do_not_block_and_backoff_expires(self):
+        state = {'schema': 1}
+        for now in ('2026-11-01T00:00:00Z', '2026-11-01T00:30:00Z'):
+            code, report, pub, cmd, tests, stage = self.exercise(
+                state, now=now, bootstrap_error=RuntimeError('BOOTSTRAP ERROR: <urlopen error [WinError 10060]>'))
+            self.assertEqual(code, 2)
+            self.assertEqual(report['failure_kind'], 'transient')
+            self.assertEqual(pub.write_channel.call_args.args[0], stable())
+            state = pub.write_channel.call_args.args[1]
+            self.assertEqual(state.get('last_attempt', {}).get('failure_count', 0), 0)
+            pub.publish_release.assert_not_called(); tests.assert_not_called()
+        code, report, pub, cmd, tests, stage = self.exercise(state, now='2026-11-01T00:45:00Z')
+        self.assertEqual(code, 0); self.assertEqual(report['status'], 'backoff')
+        self.assertEqual(cmd.call_count, 1)
+        pub.write_channel.assert_not_called(); pub.publish_release.assert_not_called()
+        code, report, pub, cmd, tests, stage = self.exercise(state, now='2026-11-01T01:30:00Z')
+        self.assertEqual(code, 0); self.assertEqual(report['status'], 'success')
+        self.assertNotIn('transient_failure', pub.write_channel.call_args.args[1])
+
+    def test_unknown_bootstrap_error_is_not_transient(self):
+        code, report, pub, *_ = self.exercise(bootstrap_error=RuntimeError('ooz compiler failed'))
+        self.assertEqual(code, 2)
+        self.assertNotEqual(report['failure_kind'], 'transient')
+        self.assertEqual(pub.write_channel.call_args.args[1]['last_attempt']['failure_count'], 1)
+
+    def test_two_validation_failures_block_and_next_run_is_warning_only(self):
+        state = {'schema': 1}
+        for count in (1, 2):
+            code, report, pub, *_ = self.exercise(state, fail=True,
+                failure_context={'issues': [{'kind': 'source_changed'}]})
+            self.assertEqual(code, 2)
+            self.assertEqual(report['failure_kind'], 'deterministic')
+            state = pub.write_channel.call_args.args[1]
+            self.assertEqual(state['last_attempt']['failure_count'], count)
+            pub.publish_release.assert_not_called()
+        code, report, pub, cmd, *_ = self.exercise(state)
+        self.assertEqual(code, 0); self.assertEqual(report['status'], 'blocked')
+        self.assertEqual(cmd.call_count, 1); pub.write_channel.assert_not_called()
+        self.assertEqual(self.exercise(state, force=True)[1]['status'], 'success')
+
+    def test_validation_evidence_wins_over_network_text(self):
+        code, report, pub, *_ = self.exercise(fail=RuntimeError('[WinError 10060]'),
+            failure_context={'issues': [{'kind': 'source_changed'}]})
+        self.assertEqual(code, 2); self.assertEqual(report['failure_kind'], 'deterministic')
+        pub.publish_release.assert_not_called()
+
+    def test_probe_network_error_has_backoff_without_a_manifest(self):
+        code, report, pub, *_ = self.exercise(probe_fail=TimeoutError('network timed out'))
+        self.assertEqual(code, 2)
+        self.assertEqual(report['failure_kind'], 'transient')
+        state = pub.write_channel.call_args.args[1]
+        self.assertIsNone(state['transient_failure']['manifest_id'])
+        self.assertNotIn('last_attempt', state)
+        code, report, pub, cmd, *_ = self.exercise(state, now='2026-11-01T00:10:00Z')
+        self.assertEqual(code, 0); self.assertEqual(report['status'], 'backoff')
+        cmd.assert_not_called(); pub.write_channel.assert_not_called()
+        self.assertEqual(self.exercise(state, now='2026-11-01T00:30:00Z')[1]['status'], 'success')
+        self.assertEqual(self.exercise(state, force=True)[1]['status'], 'success')
+
+    def test_actual_child_diagnostic_reaches_the_classifier(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(updater.subprocess, 'run', return_value=subprocess.CompletedProcess(
+                    [], 2, '', 'BOOTSTRAP ERROR: <urlopen error [WinError 10060]>')):
+                with self.assertRaises(RuntimeError) as caught:
+                    updater.execute(Path(folder), 'python', '-m', 'tools.bootstrap')
+            self.assertTrue(updater.is_transient_network_error(caught.exception))
+
+    def test_bootstrap_preserves_typed_timeout_across_process_boundary(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(updater.subprocess, 'run', return_value=subprocess.CompletedProcess(
+                    [], 75, '', 'BOOTSTRAP TRANSIENT NETWORK ERROR: timed out')):
+                with self.assertRaises(updater.TransientNetworkError):
+                    updater.execute(Path(folder), 'python', '-m', 'tools.bootstrap')
+
+    def test_all_validation_failures_prevent_publication(self):
+        for kind in ('source_changed', 'missing_en_key', 'locres_parse', 'pak_structure',
+                     'sha256_mismatch', 'placeholder', 'richtext'):
+            with self.subTest(kind=kind):
+                code, report, pub, cmd, tests, stage = self.exercise(changed=True, fail=True,
+                    failure_context={'issues': [{'kind': kind}]})
+                self.assertEqual(code, 2)
+                self.assertEqual(report['failure_kind'], 'deterministic')
+                self.assertEqual(pub.write_channel.call_args.args[0], stable())
+                pub.publish_release.assert_not_called(); stage.assert_not_called()
+                tests.assert_not_called()
 
     def test_force_retries_blocked_pair(self):
         state = {'schema': 1, 'last_attempt': {'manifest_id': '1', 'build_fingerprint': FP, 'failure_count': 2}}

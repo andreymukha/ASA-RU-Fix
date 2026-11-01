@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 
 from tools.channel_state import (
-    BUILD_INPUTS, build_fingerprint, decide, next_version, record_failure, record_success,
+    BUILD_INPUTS, backoff, build_fingerprint, decide, next_version, record_failure, record_success,
+    record_transient_failure,
 )
 
 
@@ -118,6 +119,28 @@ class ChannelStateTests(unittest.TestCase):
         success = record_success(state, '123', 'fp', '2', stable, 'now')
         stable['details']['value'] = 'mutated'
         self.assertEqual(success['latest_release']['details']['value'], 'old')
+
+    def test_transient_counter_is_separate_and_backoff_is_capped(self):
+        from datetime import datetime, timedelta, timezone
+        state = record_failure({'extra': 'keep'}, '123', 'fp', '1', 'validation', 'old')
+        previous = copy.deepcopy(state['last_attempt'])
+        now = datetime(2026, 11, 1, tzinfo=timezone.utc)
+        for minutes in (30, 60, 120, 240, 360, 360):
+            before = copy.deepcopy(state)
+            state = record_transient_failure(state, '123', 'fp', 'run', 'network', now.isoformat())
+            self.assertEqual(state['last_attempt'], previous)
+            retry = datetime.fromisoformat(state['transient_failure']['next_retry_at'].replace('Z', '+00:00'))
+            self.assertEqual(retry - now, timedelta(minutes=minutes))
+            self.assertEqual(decide(state, '123', 'fp', now=now.isoformat())['action'], 'backoff')
+            self.assertEqual(decide(state, '123', 'fp', now=retry.isoformat())['action'], 'build')
+            self.assertEqual(decide(state, '124', 'fp', now=now.isoformat())['action'], 'build')
+            self.assertEqual(decide(state, '123', 'other', now=now.isoformat())['action'], 'build')
+            self.assertEqual(decide(state, '123', 'fp', force=True)['action'], 'build')
+            self.assertEqual(before['last_attempt'], previous)
+            now = retry
+        state = record_failure(state, '123', 'fp', 'last', 'validation', now.isoformat())
+        self.assertEqual(state['last_attempt']['failure_count'], 2)
+        self.assertEqual(decide(state, '123', 'fp')['action'], 'blocked')
 
     def test_patch_version_increment_and_validation(self):
         self.assertEqual(next_version('1.2.9'), '1.2.10')

@@ -7,6 +7,7 @@ import hashlib
 import re
 import struct
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 
 # Explicit production inputs: neither mtime nor docs, tests, audit or workflow schedules
@@ -41,7 +42,7 @@ def _same_pair(record: dict | None, manifest: str, fingerprint: str) -> bool:
                 and record.get('build_fingerprint') == fingerprint)
 
 
-def decide(state: dict, manifest: str, fingerprint: str, force: bool = False) -> dict:
+def decide(state: dict, manifest: str, fingerprint: str, force: bool = False, *, now: str | None = None) -> dict:
     if force:
         return {'action': 'build', 'reason': 'forced'}
     if _same_pair(state.get('last_successful'), manifest, fingerprint):
@@ -49,7 +50,39 @@ def decide(state: dict, manifest: str, fingerprint: str, force: bool = False) ->
     attempt = state.get('last_attempt')
     if _same_pair(attempt, manifest, fingerprint) and attempt.get('failure_count', 0) >= 2:
         return {'action': 'blocked', 'reason': 'two failed attempts for this input pair'}
+    delay = backoff(state, manifest, fingerprint, now)
+    if delay:
+        return delay
     return {'action': 'build', 'reason': 'new or retryable input pair'}
+
+
+def backoff(state: dict, manifest: str | None, fingerprint: str, now: str | None = None) -> dict | None:
+    failure = state.get('transient_failure')
+    if (not failure or failure.get('manifest_id') != manifest
+            or failure.get('build_fingerprint') != fingerprint):
+        return None
+    current = datetime.fromisoformat(now.replace('Z', '+00:00')) if now else datetime.now(timezone.utc)
+    if current < datetime.fromisoformat(failure['next_retry_at'].replace('Z', '+00:00')):
+        return {'action': 'backoff', 'reason': 'transient network failure; check deferred',
+                'next_retry_at': failure['next_retry_at']}
+    return None
+
+
+def record_transient_failure(state: dict, manifest: str | None, fingerprint: str,
+                             run_id: str, reason: str, now: str) -> dict:
+    result = copy.deepcopy(state)
+    previous = state.get('transient_failure') or {}
+    same = previous.get('manifest_id') == manifest and previous.get('build_fingerprint') == fingerprint
+    count = previous.get('failure_count', 0) + 1 if same else 1
+    seconds = min(1800 * 2 ** min(count - 1, 4), 21600)
+    retry = datetime.fromisoformat(now.replace('Z', '+00:00')) + timedelta(seconds=seconds)
+    result['schema'] = 1
+    result['transient_failure'] = {
+        'manifest_id': manifest, 'build_fingerprint': fingerprint, 'run_id': str(run_id),
+        'at': now, 'status': 'backoff', 'failure_count': count, 'reason': str(reason)[:4000],
+        'next_retry_at': retry.isoformat().replace('+00:00', 'Z'),
+    }
+    return result
 
 
 def record_failure(state: dict, manifest: str, fingerprint: str, run_id: str,
@@ -58,6 +91,7 @@ def record_failure(state: dict, manifest: str, fingerprint: str, run_id: str,
     previous = state.get('last_attempt')
     count = previous.get('failure_count', 0) if _same_pair(previous, manifest, fingerprint) else 0
     attempts = previous.get('attempt_count', 0) if _same_pair(previous, manifest, fingerprint) else 0
+    result.pop('transient_failure', None)
     result['schema'] = 1
     result['last_attempt'] = {
         'manifest_id': str(manifest), 'build_fingerprint': fingerprint,
@@ -74,6 +108,7 @@ def record_success(state: dict, manifest: str, fingerprint: str, run_id: str,
     attempts = previous.get('attempt_count', 0) if _same_pair(previous, manifest, fingerprint) else 0
     pair = {'manifest_id': str(manifest), 'build_fingerprint': fingerprint,
             'run_id': str(run_id), 'at': now}
+    result.pop('transient_failure', None)
     result.update(schema=1, last_successful=copy.deepcopy(pair),
                   latest_release=copy.deepcopy(stable),
                   last_attempt={**pair, 'status': 'success', 'failure_count': 0,

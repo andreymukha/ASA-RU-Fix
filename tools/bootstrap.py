@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import errno
+import re
+import socket
 import argparse
 import json
 import os
@@ -36,6 +39,44 @@ COMPILER_FLAGS = '/nologo /LD /O2 /MT /EHsc /std:c++17'
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+class TransientNetworkError(RuntimeError):
+    """A child download process explicitly identified a transport failure."""
+
+
+def is_transient_network_error(error: Exception) -> bool:
+    """Recognize concrete transport failures, never an arbitrary bootstrap failure."""
+    diagnostic = re.split(r"(?:BOOTSTRAP|BUILD) ERROR:", str(error))[-1]
+    if re.search(r"SHA-256 mismatch|LOCRES.*(?:parse|validation).*failed|source_changed", diagnostic, re.I):
+        return False
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, TransientNetworkError):
+            return True
+        if isinstance(error, urllib.error.HTTPError):
+            return error.code in (408, 429, 500, 502, 503, 504)
+        if isinstance(error, (TimeoutError, ConnectionError)):
+            return True
+        if isinstance(error, socket.gaierror):
+            return error.errno == socket.EAI_AGAIN
+        if isinstance(error, OSError) and (
+                error.errno in (errno.ETIMEDOUT, errno.ECONNRESET, errno.ECONNREFUSED,
+                                errno.ECONNABORTED, errno.ENETUNREACH, errno.EHOSTUNREACH)
+                or getattr(error, 'winerror', None) in (10051, 10053, 10054, 10060, 10061, 10065)):
+            return True
+        # Native child processes flatten exceptions to diagnostics. Keep this
+        # allowlist narrow: "bootstrap failed" or "timeout" alone is insufficient.
+        if re.search(r'\[WinError (?:10051|10053|10054|10060|10061|10065)\]'
+                     r'|HTTP Error (?:408|429|500|502|503|504)\b'
+                     r'|System\.Net\.Sockets\.SocketException \((?:10051|10053|10054|10060|10061|10065)\)'
+                     r'|request was canceled due to the configured HttpClient\.Timeout',
+                     re.split(r'(?:BOOTSTRAP|BUILD) ERROR:', str(error))[-1], re.I):
+            return True
+        error = (error.reason if isinstance(error, urllib.error.URLError)
+                 and isinstance(error.reason, Exception) else error.__cause__)
+    return False
 
 
 def ensure_download(url: str, target: Path, digest: str):
@@ -179,5 +220,7 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError, zipfile.BadZipFile) as exc:
-        print(f'BOOTSTRAP ERROR: {exc}', file=sys.stderr)
-        raise SystemExit(2)
+        transient = is_transient_network_error(exc)
+        prefix = 'BOOTSTRAP TRANSIENT NETWORK ERROR' if transient else 'BOOTSTRAP ERROR'
+        print(f'{prefix}: {exc}', file=sys.stderr)
+        raise SystemExit(75 if transient else 2)

@@ -92,13 +92,15 @@ class ReleaseRecoveryTests(unittest.TestCase):
         }
         with patch.object(updater, 'build_fingerprint', return_value=FINGERPRINT), \
              patch.object(updater.subprocess, 'check_output', return_value=commit), \
-             patch.object(updater, 'execute'), \
-             patch.object(updater, 'probe_manifest', return_value=probe), \
+             patch.object(updater, 'execute') as commands, \
+             patch.object(updater, 'probe_manifest', return_value=probe) as probe_call, \
              patch.object(updater, 'run_tests', return_value={'result': 'PASS', 'count': 100}), \
              patch.object(updater, 'make_live_report', return_value=report), \
              patch.object(updater, 'utc_now', return_value=timestamp), \
              contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             result = updater.run_update(self.root, REPOSITORY, self.publisher, run_id=run_id)
+            self.commands = commands
+            self.probe_call = probe_call
         live = updater.read_json(self.root / 'work/live-build-report.json')
         return result, live
 
@@ -109,10 +111,10 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(self.channel.stable, self.initial_stable)
         self.assertIn('pending_release', self.channel.state)
         self.assertEqual(self.channel.state['pending_release']['commit'], FIRST_COMMIT)
-        self.assertEqual(self.channel.state['last_attempt']['failure_count'], 1)
+        self.assertNotIn('last_attempt', self.channel.state)
         self.assertTrue(report['release_created'])
         self.assertEqual(report['published_release'], self.published_metadata)
-        self.assertEqual(report['status'], 'failed')
+        self.assertEqual(report['status'], 'publication_failed')
         prepared_state = self.channel.writes[0][1]
         self.assertIn('pending_release', prepared_state)
 
@@ -146,7 +148,7 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertNotIn('pending_release', self.channel.state)
         self.assertEqual(self.channel.stable['version'], '1.0.1')
         self.assertEqual(self.channel.state['last_attempt']['failure_count'], 0)
-        self.assertEqual(self.channel.state['last_attempt']['attempt_count'], 2)
+        self.assertEqual(self.channel.state['last_attempt']['attempt_count'], 1)
         self.assertEqual(self.channel.writes[-1][2], 'Record verified Steam localization build')
 
     def test_new_manifest_unchanged_pak_cannot_discard_existing_pending_transaction(self):
@@ -158,9 +160,82 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(self.channel.state['pending_release'], original_pending)
         self.assertEqual(self.channel.stable, self.initial_stable)
         self.assertEqual(len(self.publications), 1)
-        self.assertEqual(self.channel.state['last_attempt']['failure_count'], 1)
-        self.assertEqual(self.channel.state['last_attempt']['manifest_id'], '124')
-        self.assertEqual(report['status'], 'failed')
+        self.assertNotIn('last_attempt', self.channel.state)
+        self.assertEqual(report['status'], 'publication_failed')
+
+    def test_release_timeout_is_publication_failure_without_source_backoff(self):
+        self.publisher.publish_release.side_effect = RuntimeError('[WinError 10060] upload timeout')
+        code, report = self._run(timestamp='2026-11-01T00:00:00Z')
+        self.assertEqual(code, 2)
+        self.assertEqual(report['status'], 'publication_failed')
+        self.assertEqual(report['failure_kind'], 'publication')
+        self.assertEqual(report['failure_stage'], 'release_publish')
+        self.assertIn('pending_release', self.channel.state)
+        self.assertNotIn('last_attempt', self.channel.state)
+        self.assertNotIn('transient_failure', self.channel.state)
+        self.assertEqual(self.channel.stable, self.initial_stable)
+        self.publisher.publish_release.side_effect = self._publish
+        self.assertEqual(self._run(run_id='recovery', timestamp='2026-11-01T00:01:00Z')[0], 0)
+
+    def test_pending_recovery_precedes_all_ordinary_skip_decisions(self):
+        self.fail_partial_upload = True
+        self.assertEqual(self._run()[0], 2)
+        self.channel.state.update(
+            last_successful={'manifest_id': '123', 'build_fingerprint': FINGERPRINT},
+            last_attempt={'manifest_id': '123', 'build_fingerprint': FINGERPRINT, 'failure_count': 2},
+            transient_failure={'manifest_id': None, 'build_fingerprint': FINGERPRINT,
+                               'next_retry_at': '2099-01-01T00:00:00Z'})
+        code, report = self._run(run_id='recovery')
+        self.assertEqual(code, 0)
+        self.assertTrue(report['recovering_publication'])
+        self.probe_call.assert_not_called()
+        build = next(call for call in self.commands.call_args_list if 'build.py' in call.args)
+        self.assertEqual(build.args[-1], '123')
+        self.assertEqual(len(self.publications), 2)
+        self.assertNotIn('pending_release', self.channel.state)
+
+    def test_repeated_recovery_failure_is_not_success_or_source_backoff(self):
+        self.publisher.publish_release.side_effect = RuntimeError('[WinError 10060] upload timeout')
+        for run in ('first', 'retry', 'retry-again'):
+            code, report = self._run(run_id=run, timestamp='2026-11-01T00:00:00Z')
+            self.assertEqual(code, 2)
+            self.assertEqual(report['status'], 'publication_failed')
+            self.assertEqual(report['failure_stage'], 'release_publish')
+            self.assertNotIn('transient_failure', self.channel.state)
+            self.assertNotIn('last_attempt', self.channel.state)
+            self.assertIn('pending_release', self.channel.state)
+
+    def test_channel_timeout_after_published_release_recovers_same_bytes(self):
+        original_writer = self.publisher.write_channel.side_effect
+        fail = True
+        def write(stable, state, head, message):
+            nonlocal fail
+            if fail and message == 'Record verified Steam localization build':
+                fail = False
+                raise TimeoutError('channel write timeout')
+            return original_writer(stable, state, head, message)
+        self.publisher.write_channel.side_effect = write
+        code, report = self._run()
+        self.assertEqual(code, 2)
+        self.assertEqual(report['failure_stage'], 'channel_commit')
+        self.assertTrue(report['release_created'])
+        self.assertNotIn('transient_failure', self.channel.state)
+        original_bytes = dict(self.uploaded)
+        self.assertEqual(self._run(run_id='recovery')[0], 0)
+        self.assertEqual(self.uploaded, original_bytes)
+        self.assertEqual(self.publications[0], self.publications[1])
+
+    def test_recovery_staging_failure_is_visible_without_download_backoff(self):
+        self.fail_partial_upload = True
+        self.assertEqual(self._run()[0], 2)
+        original = copy.deepcopy(self.channel.state)
+        with patch.object(updater, 'stage_release', side_effect=RuntimeError('[WinError 10060] staging error')):
+            code, report = self._run(run_id='recovery')
+        self.assertEqual(code, 2)
+        self.assertEqual(report['status'], 'publication_failed')
+        self.assertEqual(report['failure_stage'], 'release_staging')
+        self.assertEqual(self.channel.state, original)
+
 
 
 if __name__ == '__main__':

@@ -14,7 +14,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tools.channel_state import build_fingerprint, decide, next_version, record_failure, record_success
+from tools.channel_state import (backoff, build_fingerprint, decide, next_version, record_failure,
+                                 record_success, record_transient_failure)
+from tools.bootstrap import TransientNetworkError, is_transient_network_error
 from tools.cloud_report import make_live_report, run_tests
 from tools.github_publish import GitHubPublisher, PAK_NAME
 from tools.manifest_probe import probe_manifest
@@ -47,7 +49,10 @@ def execute(root: Path, *args: str) -> None:
         stream.write(f'COMMAND: {args!r}\n{output}\nEXIT: {result.returncode}\n')
     print(output, end='', flush=True)
     if result.returncode:
-        raise RuntimeError(f'command failed with exit {result.returncode}: {args!r}')
+        if (result.returncode == 75 and 'tools.bootstrap' in args
+                and 'BOOTSTRAP TRANSIENT NETWORK ERROR:' in result.stderr):
+            raise TransientNetworkError(result.stderr[-8000:])
+        raise RuntimeError(f'command failed with exit {result.returncode}: {args!r}\n{output[-8000:]}')
 
 
 def validate_channel(stable: dict, state: dict, repository: str) -> None:
@@ -166,22 +171,50 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
               'build_fingerprint': fingerprint, 'full_bootstrap': False, 'heavy_build': False,
               'downloaded_bytes': 0, 'release_created': False}
     probe, published = None, None
+    pending = state.get('pending_release')
+    recovering = pending is not None
+    report['recovering_publication'] = recovering
+    phase = 'recovery_prepare' if recovering else 'probe'
     try:
-        execute(root, sys.executable, '-m', 'tools.bootstrap', '--probe-only')
-        probe = probe_manifest(work / 'tools/depotdownloader/DepotDownloader.exe', work / 'manifest-probe')
+        delay = None if force or recovering else backoff(state, None, fingerprint, utc_now())
+        if delay:
+            report.update(status='backoff', decision=delay, warning='BACKOFF: manifest probe deferred')
+            write_json(work / 'live-build-report.json', report)
+            print(f"::warning::BACKOFF: manifest probe deferred until {delay['next_retry_at']}", flush=True)
+            return 0
+        if recovering:
+            # Complete the recorded transaction, not the latest Steam manifest.
+            # Existing recovery revalidates these inputs and preserves asset bytes.
+            if (pending['report']['build_fingerprint'] != fingerprint
+                    or pending['version'] != next_version(stable['version'])):
+                raise ValueError('pending Release belongs to different build inputs; explicit review required')
+            probe = copy.deepcopy(pending['report']['steam'])
+            decision = {'action': 'build', 'reason': 'pending Release recovery takes priority'}
+            print(f"Recovering pending Release v{pending['version']} for manifest {probe['manifest_id']}", flush=True)
+        else:
+            execute(root, sys.executable, '-m', 'tools.bootstrap', '--probe-only')
+            probe = probe_manifest(work / 'tools/depotdownloader/DepotDownloader.exe', work / 'manifest-probe')
+            print(f"Current Steam manifest: {probe['manifest_id']}; probe PAK downloaded bytes: 0", flush=True)
+            decision = decide(state, probe['manifest_id'], fingerprint, force, now=utc_now())
         report['steam'] = probe
-        print(f"Current Steam manifest: {probe['manifest_id']}; probe PAK downloaded bytes: 0", flush=True)
-        decision = decide(state, probe['manifest_id'], fingerprint, force)
         report['decision'] = decision
         if decision['action'] != 'build':
-            report['status'] = 'skipped' if decision['action'] == 'skip' else 'blocked'
+            report['status'] = 'skipped' if decision['action'] == 'skip' else decision['action']
+            if decision['action'] in ('blocked', 'backoff'):
+                report['warning'] = f"{decision['action'].upper()}: {decision['reason']}"
+                if 'next_retry_at' in decision:
+                    report['warning'] += f"; retry at {decision['next_retry_at']}"
+                print(f"::warning::{report['warning']}", flush=True)
             write_json(work / 'live-build-report.json', report)
             print('Full bootstrap, ooz, repak, server PAK download, build, full tests, Release: SKIPPED', flush=True)
-            return 0 if decision['action'] == 'skip' else 2
+            return 0
         report.update(full_bootstrap=True, heavy_build=True)
         (work / 'build_failure.json').unlink(missing_ok=True)
+        phase = 'bootstrap'
         execute(root, sys.executable, '-m', 'tools.bootstrap')
+        phase = 'source_build'
         execute(root, sys.executable, 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', probe['manifest_id'])
+        phase = 'validation'
         tests = run_tests(work / 'live-validation.log')
         report.update(make_live_report(read_json(work / 'build_validation.json'), tests, probe,
                       fingerprint=fingerprint, commit=commit, run_id=run_id,
@@ -208,11 +241,14 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
                 release_report, release_commit = copy.deepcopy(report), commit
                 state = copy.deepcopy(state)
                 state['pending_release'] = {'version': version, 'commit': commit, 'report': release_report}
+                phase = 'channel_prepare'
                 channel_head = publisher.write_channel(stable, state, channel_head,
                                                        'Prepare verified immutable Release transaction')
+            phase = 'release_staging'
             assets = stage_release(root, repository, version, release_commit, release_report,
                                    root / 'dist' / PAK_NAME, 'live-build-report.json')
             assets.sort(key=lambda path: path.name == PAK_NAME)
+            phase = 'release_publish'
             published = publisher.publish_release(version, release_commit, assets,
                 notes=f"Автоматически проверенный русский перевод. Steam manifest: {probe['manifest_id']}. Все 1264 перевода, форматирование, упаковка и тесты проверены.")
         else:
@@ -220,11 +256,22 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
         updated = update_stable(stable, report, published)
         updated_state = record_success(state, probe['manifest_id'], fingerprint, run_id, latest_release(updated), utc_now())
         updated_state.pop('pending_release', None)
+        phase = 'channel_commit'
         sha = publisher.write_channel(updated, updated_state, channel_head, 'Record verified Steam localization build')
         report.update(status='success', channel_commit=sha, stable_version=updated['version'])
         write_json(work / 'live-build-report.json', report)
         return 0
     except Exception as exc:
+        report['failure_stage'] = phase
+        if recovering or phase in ('channel_prepare', 'release_staging', 'release_publish', 'channel_commit'):
+            report.update(status='publication_failed', failure_kind='publication', error=str(exc),
+                          release_created=published is not None,
+                          pending_release=copy.deepcopy(state.get('pending_release')))
+            if published:
+                report['published_release'] = published
+            write_json(work / 'live-build-report.json', report)
+            print(f'::error::PUBLICATION FAILURE [{phase}]: {exc}', file=sys.stderr, flush=True)
+            return 2
         report.update(status='failed', release_created=published is not None, error=str(exc))
         if published:
             report['published_release'] = published
@@ -240,12 +287,23 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
             issues = detail.get('issues', [])
             report['missing'] = sum(item.get('kind') == 'missing_en_key' for item in issues)
             report['source_changed'] = sum(item.get('kind') == 'source_changed' for item in issues)
-        if probe is not None:
-            failed = record_failure(state, probe['manifest_id'], fingerprint, run_id, str(exc), utc_now())
+        transient = (phase in ('probe', 'bootstrap', 'source_build')
+                     and not report.get('validation_failure', {}).get('issues')
+                     and is_transient_network_error(exc))
+        report['failure_kind'] = 'transient' if transient else 'deterministic'
+        if probe is not None or transient:
+            if transient:
+                failed = record_transient_failure(state, probe['manifest_id'] if probe else None,
+                                                  fingerprint, run_id, str(exc), utc_now())
+                report['next_retry_at'] = failed['transient_failure']['next_retry_at']
+            else:
+                failed = record_failure(state, probe['manifest_id'], fingerprint, run_id, str(exc), utc_now())
             try:
                 report['channel_commit'] = publisher.write_channel(stable, failed, channel_head, 'Record failed Steam localization build')
             except Exception as state_error:
-                report['state_error'] = str(state_error)
+                report.update(status='publication_failed', failure_kind='publication',
+                              failure_stage='failure_state_write', state_error=str(state_error))
+                print(f'::error::CHANNEL STATE WRITE FAILURE: {state_error}', file=sys.stderr, flush=True)
         else:
             report['status'] = 'probe_failed'
         write_json(work / 'live-build-report.json', report)
