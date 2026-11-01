@@ -7,7 +7,7 @@
   },
   "build": {
     "engine_desired": 21,
-    "fingerprint": "72853b3027d0fbcb50ae0a997dc78c90c766cbb94c96b347971bce3823c242be",
+    "fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
     "shooter_desired": 1243
   },
   "channel": "stable",
@@ -18,7 +18,7 @@
   },
   "schema": 1,
   "source": {
-    "checked_at": "2026-10-30T23:37:32Z",
+    "checked_at": "2026-11-01T15:52:32Z",
     "depot_id": "2430931",
     "manifest_id": "6604340029022292600",
     "server_pak_sha256": "a7723232159c8dbae6ed25d76114259009cc2e2950bbd23381681d02950e6db3",
