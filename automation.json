@@ -1,13 +1,13 @@
 {
   "last_attempt": {
-    "at": "2026-11-08T03:38:29.614677Z",
-    "attempt_count": 2,
+    "at": "2026-11-09T03:38:20.909470Z",
+    "attempt_count": 1,
     "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 2,
-    "manifest_id": "3083367148300701914",
-    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', '3083367148300701914')\nBUILD ERROR: PAK FString has no terminator\n",
-    "run_id": "42443475025",
-    "status": "blocked"
+    "failure_count": 1,
+    "manifest_id": "1403008564163147406",
+    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', '1403008564163147406')\nBUILD ERROR: PAK FString has no terminator\n",
+    "run_id": "42557387232",
+    "status": "failed"
   },
   "last_successful": {
     "at": "2026-11-01T15:53:44.679016Z",
@@ -20,15 +20,5 @@
     "tag": "v1.0.0",
     "version": "1.0.0"
   },
-  "schema": 1,
-  "transient_failure": {
-    "at": "2026-11-09T02:52:55.669403Z",
-    "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 1,
-    "manifest_id": "1403008564163147406",
-    "next_retry_at": "2026-11-09T03:22:55.669403Z",
-    "reason": "BOOTSTRAP TRANSIENT NETWORK ERROR: <urlopen error [WinError 10060] A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond>\n",
-    "run_id": "42553253959",
-    "status": "backoff"
-  }
+  "schema": 1
 }
