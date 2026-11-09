@@ -22,13 +22,13 @@
   },
   "schema": 1,
   "transient_failure": {
-    "at": "2026-11-09T06:07:42.173243Z",
+    "at": "2026-11-09T07:22:40.131895Z",
     "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 2,
+    "failure_count": 3,
     "manifest_id": null,
-    "next_retry_at": "2026-11-09T07:07:42.173243Z",
+    "next_retry_at": "2026-11-09T09:22:40.131895Z",
     "reason": "BOOTSTRAP TRANSIENT NETWORK ERROR: HTTP Error 504: Gateway Time-out\n",
-    "run_id": "42571121769",
+    "run_id": "42578894163",
     "status": "backoff"
   }
 }
