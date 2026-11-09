@@ -1,13 +1,13 @@
 {
   "last_attempt": {
-    "at": "2026-11-09T03:38:20.909470Z",
-    "attempt_count": 1,
+    "at": "2026-11-09T03:53:34.324094Z",
+    "attempt_count": 2,
     "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 1,
+    "failure_count": 2,
     "manifest_id": "1403008564163147406",
     "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', '1403008564163147406')\nBUILD ERROR: PAK FString has no terminator\n",
-    "run_id": "42557387232",
-    "status": "failed"
+    "run_id": "42558692038",
+    "status": "blocked"
   },
   "last_successful": {
     "at": "2026-11-01T15:53:44.679016Z",
