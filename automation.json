@@ -20,5 +20,15 @@
     "tag": "v1.0.0",
     "version": "1.0.0"
   },
-  "schema": 1
+  "schema": 1,
+  "transient_failure": {
+    "at": "2026-11-12T15:12:53.805195Z",
+    "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
+    "failure_count": 1,
+    "manifest_id": null,
+    "next_retry_at": "2026-11-12T15:42:53.805195Z",
+    "reason": "BOOTSTRAP TRANSIENT NETWORK ERROR: HTTP Error 500: Internal Server Error\n",
+    "run_id": "43244316436",
+    "status": "backoff"
+  }
 }
