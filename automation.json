@@ -1,13 +1,13 @@
 {
   "last_attempt": {
-    "at": "2026-11-11T00:38:31.309709Z",
-    "attempt_count": 2,
+    "at": "2026-11-13T19:23:36.772293Z",
+    "attempt_count": 1,
     "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 2,
-    "manifest_id": "3866706003566311928",
-    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', '3866706003566311928')\nBUILD ERROR: PAK FString has no terminator\n",
-    "run_id": "42932754042",
-    "status": "blocked"
+    "failure_count": 1,
+    "manifest_id": "1699900905164446885",
+    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', '1699900905164446885')\nBUILD ERROR: PAK FString has no terminator\n",
+    "run_id": "43491540944",
+    "status": "failed"
   },
   "last_successful": {
     "at": "2026-11-01T15:53:44.679016Z",
@@ -20,15 +20,5 @@
     "tag": "v1.0.0",
     "version": "1.0.0"
   },
-  "schema": 1,
-  "transient_failure": {
-    "at": "2026-11-12T15:12:53.805195Z",
-    "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 1,
-    "manifest_id": null,
-    "next_retry_at": "2026-11-12T15:42:53.805195Z",
-    "reason": "BOOTSTRAP TRANSIENT NETWORK ERROR: HTTP Error 500: Internal Server Error\n",
-    "run_id": "43244316436",
-    "status": "backoff"
-  }
+  "schema": 1
 }
