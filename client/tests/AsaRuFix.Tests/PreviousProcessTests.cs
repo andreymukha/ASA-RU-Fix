@@ -30,4 +30,45 @@ public class PreviousProcessTests
         }
         finally { File.Delete(output); }
     }
+
+    [TestMethod]
+    public async Task NewlyStartedProcessHasVerifiableImageBeforeModulesLoad()
+    {
+        var child = Environment.GetEnvironmentVariable("ASA_RU_FIX_CHILD_PROBE")!;
+        var output = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+        try
+        {
+            var start = new ProcessStartInfo(child) { UseShellExecute = false };
+            start.ArgumentList.Add(output); start.ArgumentList.Add("0");
+            start.Environment["ASA_RU_FIX_FIXTURE_DELAY_MS"] = "100";
+            for (int i = 0; i < 8; i++)
+            {
+                using var process = Process.Start(start)!;
+                await PreviousProcess.WaitAsync(process.Id, child, TimeSpan.FromSeconds(5));
+                Assert.IsTrue(process.HasExited);
+            }
+        }
+        finally { File.Delete(output); }
+    }
+
+    [TestMethod]
+    public async Task ActiveProcessWithDifferentExecutableIsRejected()
+    {
+        var child = Environment.GetEnvironmentVariable("ASA_RU_FIX_CHILD_PROBE")!;
+        var output = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+        try
+        {
+            var start = new ProcessStartInfo(child) { UseShellExecute = false };
+            start.ArgumentList.Add(output); start.ArgumentList.Add("0");
+            start.Environment["ASA_RU_FIX_FIXTURE_DELAY_MS"] = "300";
+            using var process = Process.Start(start)!;
+            try
+            {
+                await Assert.ThrowsAsync<InvalidDataException>(() =>
+                    PreviousProcess.WaitAsync(process.Id, child + ".other", TimeSpan.FromSeconds(5)));
+            }
+            finally { await process.WaitForExitAsync(); }
+        }
+        finally { File.Delete(output); }
+    }
 }

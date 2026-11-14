@@ -42,7 +42,7 @@ internal static class SelfUpdateHelper
         ValidatePending(pending);
         if (pending.Version != AppRuntime.Version || ReadFileVersion(PendingPath) != pending.Version)
             throw new InvalidDataException("Версия выполняемого helper не соответствует отложенному обновлению.");
-        await WaitForPreviousUpdaterAsync(oldPid).ConfigureAwait(false);
+        await PreviousProcess.WaitAsync(oldPid, AppRuntime.Paths.Executable, TimeSpan.FromSeconds(60)).ConfigureAwait(false);
 
         using var lease = UserMutex.TryAcquire(AppRuntime.MutexName, TimeSpan.FromSeconds(60))
             ?? throw new TimeoutException("Updater уже выполняет другую операцию.");
@@ -104,25 +104,6 @@ internal static class SelfUpdateHelper
             new FileInfo(PendingPath).Length != pending.Size ||
             !string.Equals(AtomicFile.Sha256(PendingPath), pending.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Размер или SHA-256 pending EXE не соответствует metadata.");
-    }
-
-    private static async Task WaitForPreviousUpdaterAsync(int oldPid)
-    {
-        Process process;
-        try { process = Process.GetProcessById(oldPid); }
-        catch (ArgumentException) { return; }
-        using (process)
-        {
-            if (process.HasExited) return;
-            string? executable;
-            try { executable = process.MainModule?.FileName; }
-            catch (InvalidOperationException) when (process.HasExited) { return; }
-            if (!SamePath(executable, AppRuntime.Paths.Executable))
-                throw new InvalidDataException("PID не принадлежит установленному updater.");
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            try { await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException) { throw new TimeoutException("Предыдущий updater не завершился за 60 секунд."); }
-        }
     }
 
     private static string ReadFileVersion(string path)
