@@ -1,138 +1,22 @@
 {
   "last_attempt": {
-    "at": "2026-11-13T19:38:52.624661Z",
-    "attempt_count": 2,
-    "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "failure_count": 2,
+    "at": "2026-11-14T14:38:55.296624Z",
+    "attempt_count": 1,
+    "build_fingerprint": "0657946702a3b4a33dca7b1328e198b9c3af49a30c88b1df710adc0ee7b2ab36",
+    "failure_count": 0,
     "manifest_id": "1699900905164446885",
-    "reason": "command failed with exit 2: ('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.12.10\\\\x64\\\\python.exe', 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', '1699900905164446885')\nBUILD ERROR: PAK FString has no terminator\n",
-    "run_id": "43493914451",
-    "status": "blocked"
+    "run_id": "43605802625",
+    "status": "success"
   },
   "last_successful": {
-    "at": "2026-11-01T15:53:44.679016Z",
-    "build_fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
-    "manifest_id": "6604340029022292600",
-    "run_id": "41323379889"
+    "at": "2026-11-14T14:38:55.296624Z",
+    "build_fingerprint": "0657946702a3b4a33dca7b1328e198b9c3af49a30c88b1df710adc0ee7b2ab36",
+    "manifest_id": "1699900905164446885",
+    "run_id": "43605802625"
   },
   "latest_release": {
-    "sha256": "914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b",
-    "tag": "v1.0.0",
-    "version": "1.0.0"
-  },
-  "pending_release": {
-    "commit": "c882c47a01dd2354d5b0cbcc212e84717c9250a0",
-    "report": {
-      "build_fingerprint": "0657946702a3b4a33dca7b1328e198b9c3af49a30c88b1df710adc0ee7b2ab36",
-      "decision": {
-        "action": "build",
-        "reason": "new or retryable input pair"
-      },
-      "downloaded_bytes": 1156646640,
-      "dynamic_classification": {
-        "Engine": {
-          "additions": 0,
-          "already_correct": 5,
-          "corrections": 16,
-          "desired": 21,
-          "missing": 0,
-          "source_changed": 0
-        },
-        "ShooterGame": {
-          "additions": 0,
-          "already_correct": 1,
-          "corrections": 1242,
-          "desired": 1243,
-          "missing": 0,
-          "source_changed": 0
-        }
-      },
-      "final_pak": {
-        "path": "ASA_RU_Fix_P.pak",
-        "sha256": "97849b22c2baf0c83eb6c861eeebd1fba858d044cb96c5950c8440ff9ce53b1d",
-        "size": 13634441
-      },
-      "full_bootstrap": true,
-      "git_commit": "c882c47a01dd2354d5b0cbcc212e84717c9250a0",
-      "heavy_build": true,
-      "pak_changed": true,
-      "placeholder_printf_richtext_validation": {
-        "entries_checked": 1264,
-        "issues": 0,
-        "placeholder_strings": 238,
-        "richtext_strings": 23,
-        "source_markup_fragments": 1,
-        "status": "PASS"
-      },
-      "previous_stable_pak_sha256": "914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b",
-      "recovering_publication": false,
-      "release_created": true,
-      "release_tag": "v1.0.1",
-      "repak_validation": "PASS",
-      "run_id": "43605802625",
-      "schema": 1,
-      "source": {
-        "app_id": "2430930",
-        "depot_id": "2430931",
-        "downloaded_bytes": 1156646640,
-        "kind": "steam-dedicated-server",
-        "manifest": "1699900905164446885",
-        "pak_sha256": "68eb76d78cb7c2e124bf12d50a07396f4b5e5b2db6bfb781475ffb74dd1c7878",
-        "pak_size": 1496239896
-      },
-      "steam": {
-        "app_id": "2430930",
-        "branch": "public",
-        "checked_at": "2026-11-14T14:37:31Z",
-        "depot_id": "2430931",
-        "depotdownloader_version": "3.4.0+c553ef4d60c00a4f5fd16c9fe017f569001589ff",
-        "downloaded_bytes": 0,
-        "manifest_id": "1699900905164446885",
-        "metadata_bytes_on_disk": 561518
-      },
-      "stock_locres": {
-        "Engine EN": {
-          "entries": 66406,
-          "sha256": "88a8a93a9ccc70ae63612b90f4c779c214ee481198c9e3a45f69ac1fae73b1ef",
-          "size": 5411360,
-          "status": "PASS",
-          "version": 3
-        },
-        "Engine RU": {
-          "entries": 66406,
-          "sha256": "225390fe267ca285ecfe353eae3a3afe3a6413e8300d6e50ecbc95f5840a2e04",
-          "size": 8257266,
-          "status": "PASS",
-          "version": 3
-        },
-        "ShooterGame EN": {
-          "entries": 39755,
-          "sha256": "eb0d8e29d20af156f2fc5f1fe7233224eeb592e3140ecf8f8af769e763332a3c",
-          "size": 3692794,
-          "status": "PASS",
-          "version": 3
-        },
-        "ShooterGame RU": {
-          "entries": 39755,
-          "sha256": "859dd608c569f08db8036756de6ee063ecf879c5a2e9d1430f8c6cbbeb4f335b",
-          "size": 5386647,
-          "status": "PASS",
-          "version": 3
-        }
-      },
-      "tests": {
-        "count": 204,
-        "errors": 0,
-        "failures": 0,
-        "result": "PASS"
-      },
-      "timestamp_utc": "2026-11-14T14:38:44.371660Z",
-      "translation_counts": {
-        "engine_desired": 21,
-        "shooter_desired": 1243
-      },
-      "version": "1.0.1"
-    },
+    "sha256": "97849b22c2baf0c83eb6c861eeebd1fba858d044cb96c5950c8440ff9ce53b1d",
+    "tag": "v1.0.1",
     "version": "1.0.1"
   },
   "schema": 1

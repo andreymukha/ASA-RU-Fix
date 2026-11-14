@@ -1,59 +1,59 @@
 {
   "artifact": {
-    "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/v1.0.0/ASA_RU_Fix_P.pak",
+    "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/v1.0.1/ASA_RU_Fix_P.pak",
     "filename": "ASA_RU_Fix_P.pak",
-    "sha256": "914589668aa41516915a68ef233873f4aeeedf570db70a7232e36ff9e8c04f2b",
-    "size": 10795036
+    "sha256": "97849b22c2baf0c83eb6c861eeebd1fba858d044cb96c5950c8440ff9ce53b1d",
+    "size": 13634441
   },
   "build": {
     "engine_desired": 21,
-    "fingerprint": "179765cdba12e28399fcce874d36ba547398aeadb017c334598dc83a53d23e63",
+    "fingerprint": "0657946702a3b4a33dca7b1328e198b9c3af49a30c88b1df710adc0ee7b2ab36",
     "shooter_desired": 1243
   },
   "channel": "stable",
   "release": {
-    "commit": "d675366eed03434cdc762b4e2baf3a180e909515",
-    "published_at": "2026-10-03T04:18:34Z",
-    "tag": "v1.0.0"
+    "commit": "c882c47a01dd2354d5b0cbcc212e84717c9250a0",
+    "published_at": "2026-11-14T14:38:54Z",
+    "tag": "v1.0.1"
   },
   "schema": 1,
   "source": {
-    "checked_at": "2026-11-01T15:52:32Z",
+    "checked_at": "2026-11-14T14:37:31Z",
     "depot_id": "2430931",
-    "manifest_id": "6604340029022292600",
-    "server_pak_sha256": "a7723232159c8dbae6ed25d76114259009cc2e2950bbd23381681d02950e6db3",
-    "server_pak_size": 1487841986,
+    "manifest_id": "1699900905164446885",
+    "server_pak_sha256": "68eb76d78cb7c2e124bf12d50a07396f4b5e5b2db6bfb781475ffb74dd1c7878",
+    "server_pak_size": 1496239896,
     "steam_app_id": "2430930",
     "stock_locres": {
       "Engine EN": {
-        "entries": 48284,
-        "sha256": "c0ae7e3dc9fb0f38ab39064f4556737c7ebf3a7ed8bd3971dd6dd0912ddf2d30",
-        "size": 3909182,
+        "entries": 66406,
+        "sha256": "88a8a93a9ccc70ae63612b90f4c779c214ee481198c9e3a45f69ac1fae73b1ef",
+        "size": 5411360,
         "status": "PASS",
         "version": 3
       },
       "Engine RU": {
-        "entries": 45771,
-        "sha256": "4e9e6bc08b577c947ec67bc1168633916f464d45ce973c8a5f6de54159a9d475",
-        "size": 5805962,
+        "entries": 66406,
+        "sha256": "225390fe267ca285ecfe353eae3a3afe3a6413e8300d6e50ecbc95f5840a2e04",
+        "size": 8257266,
         "status": "PASS",
         "version": 3
       },
       "ShooterGame EN": {
-        "entries": 39444,
-        "sha256": "efb6606905da0c3b5883c2472b253db5e22f5cd2e948cb0d1601b565ce41a216",
-        "size": 3669617,
+        "entries": 39755,
+        "sha256": "eb0d8e29d20af156f2fc5f1fe7233224eeb592e3140ecf8f8af769e763332a3c",
+        "size": 3692794,
         "status": "PASS",
         "version": 3
       },
       "ShooterGame RU": {
-        "entries": 35598,
-        "sha256": "be8b5d46901bc3780be0454dbc9545908cdb35b6cc59cd5dd48315d9887a1d44",
-        "size": 4996378,
+        "entries": 39755,
+        "sha256": "859dd608c569f08db8036756de6ee063ecf879c5a2e9d1430f8c6cbbeb4f335b",
+        "size": 5386647,
         "status": "PASS",
         "version": 3
       }
     }
   },
-  "version": "1.0.0"
+  "version": "1.0.1"
 }
