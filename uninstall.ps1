@@ -19,6 +19,13 @@ if (-not $GamePath) {
     $GamePath = $found[0]
 }
 $target = Join-Path $GamePath 'ShooterGame\Content\Paks\ASA_RU_Fix_P.pak'
+$paks = Split-Path -Parent $target
+if ((Test-Path -LiteralPath ([IO.Path]::ChangeExtension($target, '.utoc'))) -or
+    (Test-Path -LiteralPath ([IO.Path]::ChangeExtension($target, '.ucas'))) -or
+    (Test-Path -LiteralPath (Join-Path $paks '.asa-ru-fix-bundle.json')) -or
+    (Test-Path -LiteralPath (Join-Path $paks '.asa-ru-fix-transaction'))) {
+    throw 'An IoStore bundle exists or is being recovered. Use ASA RU Fix to uninstall it.'
+}
 if (Test-Path -LiteralPath $target -PathType Leaf) {
     if ($PSCmdlet.ShouldProcess($target, 'Remove only ASA_RU_Fix_P.pak')) { Remove-Item -LiteralPath $target -Force }
 } else { Write-Host "Patch file is not installed: $target" }

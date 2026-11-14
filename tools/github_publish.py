@@ -15,12 +15,11 @@ import tempfile
 from pathlib import Path
 from urllib.parse import quote
 
-from tools.channel_state import next_version
+from tools.channel_state import COMPANION_NAMES, PAK_NAME, next_version
 
 
 BOT = {'name': 'github-actions[bot]',
        'email': '41898282+github-actions[bot]@users.noreply.github.com'}
-PAK_NAME = 'ASA_RU_Fix_P.pak'
 
 
 class GitHubError(RuntimeError):
@@ -190,6 +189,9 @@ class GitHubPublisher:
             expected[path.name] = (path, _file_hash(path))
         if PAK_NAME not in expected:
             raise ValueError(f'release requires {PAK_NAME}')
+        provided_companions = set(expected).intersection(COMPANION_NAMES)
+        if provided_companions and provided_companions != set(COMPANION_NAMES):
+            raise ValueError('release companions must include both .utoc and .ucas')
         tag = f'v{version}'
         tag_commit = self._tag_commit(tag)
         if tag_commit is not None and tag_commit != commit:
@@ -223,6 +225,8 @@ class GitHubPublisher:
             if self._tag_commit(tag) != commit:
                 raise GitHubError('release tag commit changed before publication')
             release = self._api(f'releases/{release["id"]}', method='PATCH', body={'draft': False})
+            if self._verify_assets(release, expected):
+                raise GitHubError('published release has missing assets')
         if release.get('draft') or not release.get('published_at'):
             raise GitHubError('release was not published')
         if self._tag_commit(tag) != commit:

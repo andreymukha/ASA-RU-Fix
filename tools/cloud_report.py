@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from tools.bootstrap import DEPOTDOWNLOADER_VERSION
+from tools.channel_state import COMPANION_NAMES, bundle_identities
 from tools.server_depot import APP_ID, DEPOT_ID, EXPECTED_PAK_SHA256, EXPECTED_PAK_SIZE, PINNED_MANIFEST, PINNED_STOCK
 
 SERVER_BUILD_ID = "25683903"
@@ -59,7 +60,7 @@ def make_report(build: dict, tests: dict, *, commit: str, timestamp: str | None 
         raise RuntimeError("cloud build did not validate exactly the four pinned stock LOCRES files")
     if build.get("package", {}).get("list_info_unpack") != "PASS":
         raise RuntimeError("repak info/list/unpack did not pass")
-    return {
+    report = {
         "timestamp_utc": timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "git_commit": commit,
         "runner_os": platform.platform(),
@@ -87,6 +88,10 @@ def make_report(build: dict, tests: dict, *, commit: str, timestamp: str | None 
             "deterministic_match": build["deterministic_match"],
         },
     }
+    if 'companions' in build:
+        identities = bundle_identities({**report, 'companions': build['companions']})
+        report['companions'] = {name: identities[name] for name in COMPANION_NAMES}
+    return report
 
 
 def make_live_report(build: dict, tests: dict, probe: dict, *, fingerprint: str,
@@ -113,7 +118,7 @@ def make_live_report(build: dict, tests: dict, probe: dict, *, fingerprint: str,
                 or counts['missing'] or counts['source_changed']
                 or item['desired_verification'] != {'expected': total, 'actual': total, 'mismatches': 0}):
             raise RuntimeError(f'live desired verification failed: {name}')
-    return {
+    report = {
         'schema': 1, 'timestamp_utc': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         'run_id': run_id, 'git_commit': commit, 'build_fingerprint': fingerprint,
         'steam': probe, 'source': source, 'downloaded_bytes': source['downloaded_bytes'],
@@ -125,6 +130,10 @@ def make_live_report(build: dict, tests: dict, probe: dict, *, fingerprint: str,
         'previous_stable_pak_sha256': previous_sha, 'pak_changed': build['pak_sha256'] != previous_sha,
         'release_created': False,
     }
+    if 'companions' in build:
+        identities = bundle_identities({**report, 'companions': build['companions']})
+        report['companions'] = {name: identities[name] for name in COMPANION_NAMES}
+    return report
 
 
 def main() -> int:

@@ -42,6 +42,8 @@ jobs:
         shell: pwsh
         run: |
           $updateArgs = @('-m', 'tools.auto_update', 'run', '--repository', $env:GITHUB_REPOSITORY)
+          # The first IoStore bundle must match the PAK verified in the installed game.
+          $updateArgs += @('--expected-first-pak', '97849b22c2baf0c83eb6c861eeebd1fba858d044cb96c5950c8440ff9ce53b1d')
           if ($env:FORCE_REBUILD -eq 'true') { $updateArgs += '--force-rebuild' }
           python @updateArgs
           exit $LASTEXITCODE

@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from tools.channel_state import COMPANION_NAMES
 from tools.github_publish import GitHubPublisher, GitHubError
 
 
@@ -56,7 +57,7 @@ class FakeGitHub:
             for filename in args[4:args.index('--repo')]:
                 path = Path(filename)
                 row = self.asset(path.name, path.read_bytes())
-                if self.bad_uploaded_digest:
+                if self.bad_uploaded_digest in (True, path.name):
                     row['digest'] = 'sha256:' + '0' * 64
                 self.release['assets'].append(row)
             return self.result({})
@@ -148,6 +149,9 @@ class ChannelPublishingTests(unittest.TestCase):
         self.fake.head = OLD
         self.publisher.write_channel({}, {}, OLD, 'update')
         self.assertEqual(self.fake.bodies['repos/owner/repo/git/trees'][0]['base_tree'], 'tree-old')
+        # Any client.json in the base tree is retained; the update mentions only these documents.
+        self.assertEqual({row['path'] for row in self.fake.bodies['repos/owner/repo/git/trees'][0]['tree']},
+                         {'stable.json', 'automation.json'})
         self.assertEqual(self.fake.bodies['repos/owner/repo/git/commits'][0]['parents'], [OLD])
         self.assertEqual(self.fake.bodies['repos/owner/repo/git/refs/heads/channel'][0], {'sha': COMMIT, 'force': False})
 
@@ -269,6 +273,27 @@ class ReleasePublishingTests(unittest.TestCase):
         with self.assertRaisesRegex(GitHubError, 'SHA-256'):
             self.publish()
         self.assertTrue(self.fake.release['draft'])
+
+    def test_release_requires_both_companions_if_either_is_present(self):
+        path = Path(self.folder.name) / COMPANION_NAMES[0]
+        path.write_bytes(b'utoc fixture')
+        with self.assertRaisesRegex(ValueError, 'both'):
+            self.publisher.publish_release('1.0.1', COMMIT, self.assets + [path], notes='')
+        self.assertEqual(self.fake.calls, [])
+
+    def test_each_companion_digest_is_verified_before_release_is_public(self):
+        for name in COMPANION_NAMES:
+            path = Path(self.folder.name) / name
+            path.write_bytes(name.encode('utf-8'))
+            self.assets.append(path)
+        for name in COMPANION_NAMES:
+            with self.subTest(name=name):
+                fake = FakeGitHub()
+                fake.bad_uploaded_digest = name
+                publisher = GitHubPublisher('owner/repo', run=fake)
+                with self.assertRaisesRegex(GitHubError, f'SHA-256 mismatch: {name}'):
+                    publisher.publish_release('1.0.1', COMMIT, self.assets, notes='')
+                self.assertTrue(fake.release['draft'])
 
     def test_existing_public_missing_asset_refused(self):
         self.existing()

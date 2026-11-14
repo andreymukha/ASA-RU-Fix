@@ -36,6 +36,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force work\artifact | Out-Null
           Copy-Item dist\ASA_RU_Fix_P.pak work\artifact\ASA_RU_Fix_P.pak
+          Copy-Item dist\ASA_RU_Fix_P.utoc, dist\ASA_RU_Fix_P.ucas work\artifact\
           Copy-Item work\cloud-build-report.json work\artifact\cloud-build-report.json
           Copy-Item work\cloud-validation.log work\artifact\cloud-validation.log
 

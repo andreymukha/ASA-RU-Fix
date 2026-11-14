@@ -10,13 +10,18 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 
+PAK_NAME = 'ASA_RU_Fix_P.pak'
+COMPANION_NAMES = ('ASA_RU_Fix_P.utoc', 'ASA_RU_Fix_P.ucas')
+BUNDLE_NAMES = (PAK_NAME, *COMPANION_NAMES)
+
+
 # Explicit production inputs: neither mtime nor docs, tests, audit or workflow schedules
 # change the identity. Missing inputs are errors rather than an incomplete fingerprint.
 BUILD_INPUTS = (
     '.gitattributes',
     'build.py',
     'tools/auto_update.py', 'tools/bootstrap.py', 'tools/channel_state.py',
-    'tools/cloud_report.py', 'tools/corrections.py', 'tools/github_publish.py',
+    'tools/cloud_report.py', 'tools/corrections.py', 'tools/github_publish.py', 'tools/iostore_companions.py',
     'tools/locres.py', 'tools/manifest_probe.py', 'tools/oodle.py',
     'tools/ooz_bridge.cpp', 'tools/pak_order.py', 'tools/pakv12.py', 'tools/server_depot.py',
     'tools/steam.py', 'tools/translation_data.py',
@@ -122,3 +127,21 @@ def next_version(previous_version: str) -> str:
         raise ValueError('version must be canonical x.y.z')
     major, minor, patch = map(int, previous_version.split('.'))
     return f'{major}.{minor}.{patch + 1}'
+
+
+def artifact_identity(record: dict) -> dict:
+    if not isinstance(record, dict):
+        raise ValueError('invalid artifact: expected an object')
+    size, digest = record.get('size'), record.get('sha256')
+    if (type(size) is not int or size <= 0 or not isinstance(digest, str)
+            or not re.fullmatch(r'[0-9a-f]{64}', digest)):
+        raise ValueError('invalid artifact size or SHA-256')
+    return {'size': size, 'sha256': digest}
+
+
+def bundle_identities(report: dict) -> dict:
+    companions = report.get('companions')
+    if not isinstance(companions, dict) or set(companions) != set(COMPANION_NAMES):
+        raise ValueError('verified bundle requires exactly the .utoc and .ucas companions')
+    return {PAK_NAME: artifact_identity(report['final_pak']),
+            **{name: artifact_identity(companions[name]) for name in COMPANION_NAMES}}

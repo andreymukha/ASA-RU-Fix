@@ -1,4 +1,4 @@
-"""Extract the current ASA language resources, apply corrections, and verify a patch PAK."""
+"""Build and verify the ASA translation PAK and its IoStore companions."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from pathlib import Path
 from tools.locres import LocresError, load_edits, parse, serialize, insert_missing
 from tools.corrections import validate_corrections, verify_applied
 from tools.translation_data import classify_desired, load_source_identity
+from tools.iostore_companions import write_companions
 from tools.steam import find_game
 from tools.pakv12 import PakReader
 from tools.pak_order import canonicalize_pak
@@ -170,6 +171,8 @@ def main() -> int:
     parser.add_argument("--repak", type=Path, help="repak v0.2.3 executable")
     parser.add_argument('--output', type=Path, help='Output PAK path (defaults to dist/ASA_RU_Fix_P.pak)')
     args = parser.parse_args()
+    if args.output and args.output.suffix.lower() != '.pak':
+        parser.error('--output must have a .pak extension')
     if args.profile == 'pinned':
         if args.manifest not in (None, PINNED_MANIFEST):
             parser.error('pinned profile requires the pinned manifest')
@@ -283,6 +286,7 @@ def main() -> int:
     }
     if quality_validation['status'] != 'PASS':
         raise RuntimeError(f'placeholder/RichText validation failed: {quality_validation}')
+    companions = write_companions(dist)
     validation_report = {'profile': args.profile, 'resources': reports, 'package': package,
                          'stock_input_validation': stock_validation,
                          'source': source_report,
@@ -290,6 +294,7 @@ def main() -> int:
                          'translation_validation': quality_validation,
                          'pak_path': str(dist), 'pak_size': pak_size,
                          'pak_sha256': pak_sha256,
+                         'companions': companions,
                          'expected_pak_sha256': EXPECTED_PAK_SHA256 if args.profile == 'pinned' else None,
                          'deterministic_match': deterministic_match}
     (work / 'build_validation.json').write_text(json.dumps(validation_report, indent=2) + '\n', encoding='utf-8')
@@ -299,6 +304,8 @@ def main() -> int:
           f"{quality_validation['issues']} issues; PASS")
     print(f"Verified {args.profile} PAK: {dist} ({pak_size:,} bytes); SHA-256 {pak_sha256}; "
           f"matches pinned v1: {deterministic_match}")
+    for name, info in companions.items():
+        print(f"Verified IoStore companion: {name} ({info['size']} bytes); SHA-256 {info['sha256']}")
     return 0
 
 

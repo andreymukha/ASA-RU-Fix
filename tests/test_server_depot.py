@@ -126,6 +126,14 @@ class DeterministicOutputTests(unittest.TestCase):
         self.assertEqual(report["git_commit"], "c" * 40)
         self.assertEqual(report["steam"]["downloaded_bytes"], 12)
         self.assertEqual(report["tests"]["count"], 75)
+        self.assertNotIn("companions", report)  # Historical pinned reports remain valid.
+        companions = {"ASA_RU_Fix_P.utoc": {"size": 268, "sha256": "a" * 64},
+                      "ASA_RU_Fix_P.ucas": {"size": 48, "sha256": "b" * 64}}
+        report = make_report({**build, "companions": companions}, tests, commit="c" * 40)
+        self.assertEqual(report["companions"], companions)
+        with self.assertRaisesRegex(ValueError, "requires exactly"):
+            make_report({**build, "companions": {"ASA_RU_Fix_P.utoc": companions["ASA_RU_Fix_P.utoc"]}},
+                        tests, commit="c" * 40)
         build["pak_sha256"] = "0" * 64
         with self.assertRaisesRegex(RuntimeError, "byte-identical"):
             make_report(build, tests, commit="c" * 40)

@@ -2,6 +2,10 @@
 param([string]$GamePath)
 $ErrorActionPreference = 'Stop'
 $patch = Join-Path $PSScriptRoot 'dist\ASA_RU_Fix_P.pak'
+if ((Test-Path -LiteralPath ([IO.Path]::ChangeExtension($patch, '.utoc'))) -or
+    (Test-Path -LiteralPath ([IO.Path]::ChangeExtension($patch, '.ucas')))) {
+    throw 'This script only installs historical single-PAK builds. Use ASA RU Fix to install the IoStore bundle.'
+}
 if (-not (Test-Path -LiteralPath $patch -PathType Leaf)) { throw "Patch PAK not found: $patch. Run python build.py first." }
 
 function Find-AsaInstall {
@@ -34,6 +38,13 @@ if (-not $GamePath) {
     $GamePath = $matches[0]
 }
 $destination = Join-Path $GamePath 'ShooterGame\Content\Paks\ASA_RU_Fix_P.pak'
+$paks = Split-Path -Parent $destination
+if ((Test-Path -LiteralPath ([IO.Path]::ChangeExtension($destination, '.utoc'))) -or
+    (Test-Path -LiteralPath ([IO.Path]::ChangeExtension($destination, '.ucas'))) -or
+    (Test-Path -LiteralPath (Join-Path $paks '.asa-ru-fix-bundle.json')) -or
+    (Test-Path -LiteralPath (Join-Path $paks '.asa-ru-fix-transaction'))) {
+    throw 'An IoStore bundle exists or is being recovered. Use ASA RU Fix to update it.'
+}
 if ($PSCmdlet.ShouldProcess($destination, 'Copy/replace only ASA_RU_Fix_P.pak')) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
     Copy-Item -LiteralPath $patch -Destination $destination -Force

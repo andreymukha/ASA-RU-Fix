@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +31,12 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.digest = hashlib.sha256(self.raw_pak).hexdigest()
         (self.root / 'dist').mkdir()
         (self.root / 'dist' / updater.PAK_NAME).write_bytes(self.raw_pak)
+        self.companions = {}
+        for suffix in ('utoc', 'ucas'):
+            name = f'ASA_RU_Fix_P.{suffix}'
+            raw = suffix.encode('ascii')
+            (self.root / 'dist' / name).write_bytes(raw)
+            self.companions[name] = {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
         (self.root / 'work').mkdir()
         updater.write_json(self.root / 'work/build_validation.json', {})
         stable = {
@@ -82,13 +89,14 @@ class ReleaseRecoveryTests(unittest.TestCase):
         return copy.deepcopy(self.published_metadata)
 
     def _run(self, *, run_id='first-run', commit=FIRST_COMMIT, timestamp='first-time',
-             manifest='123', changed=True):
+             manifest='123', changed=True, companions=None):
         probe = {'app_id': '2430930', 'depot_id': '2430931', 'manifest_id': manifest, 'checked_at': timestamp}
         report = {
             'timestamp_utc': timestamp, 'run_id': run_id, 'git_commit': commit,
             'steam': probe, 'source': {'pak_size': 123, 'pak_sha256': 'e' * 64},
             'stock_locres': {}, 'build_fingerprint': FINGERPRINT, 'pak_changed': changed,
-            'final_pak': {'path': updater.PAK_NAME, 'size': len(self.raw_pak), 'sha256': self.digest},
+            'final_pak': {'path': updater.PAK_NAME, 'size': len(self.raw_pak), 'sha256': self.digest if changed else 'd' * 64},
+            'companions': self.companions if companions is None else companions,
         }
         with patch.object(updater, 'build_fingerprint', return_value=FINGERPRINT), \
              patch.object(updater.subprocess, 'check_output', return_value=commit), \
@@ -135,7 +143,17 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(staged_report['run_id'], 'first-run')
         self.assertEqual(staged_report['timestamp_utc'], 'first-time')
         self.assertEqual(report['run_id'], 'second-run')
-        self.assertEqual(self.channel.stable['release']['commit'], FIRST_COMMIT)
+        self.assertEqual(self.channel.stable['release'], self.initial_stable['release'])
+        self.assertEqual(self.channel.stable['bundle']['release']['commit'], FIRST_COMMIT)
+        staged_manifest = json.loads(second[2]['release-manifest.json'])
+        for key in ('schema', 'channel', 'version', 'release', 'artifact'):
+            self.assertEqual(staged_manifest[key], self.initial_stable[key])
+        self.assertEqual(staged_manifest['bundle']['version'], '1.0.2')
+        self.assertEqual(staged_manifest['bundle']['artifacts'], self.channel.stable['bundle']['artifacts'])
+        self.assertEqual({name for name in second[2] if name.startswith('ASA_RU_Fix_P.')}, set(updater.BUNDLE_NAMES))
+        sums = second[2]['SHA256SUMS.txt'].decode('utf-8')
+        for name in updater.BUNDLE_NAMES:
+            self.assertIn(f'{hashlib.sha256(second[2][name]).hexdigest()}  {name}', sums)
         self.assertNotIn('pending_release', self.channel.state)
         self.assertEqual(self.channel.state['last_successful']['run_id'], 'second-run')
 
@@ -146,7 +164,8 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(self._run(run_id='recovery', commit=NEXT_COMMIT, timestamp='recovery-time')[0], 0)
         self.assertEqual(self.publications[0], self.publications[1])
         self.assertNotIn('pending_release', self.channel.state)
-        self.assertEqual(self.channel.stable['version'], '1.0.1')
+        self.assertEqual(self.channel.stable['version'], '1.0.0')
+        self.assertEqual(self.channel.stable['bundle']['version'], '1.0.2')
         self.assertEqual(self.channel.state['last_attempt']['failure_count'], 0)
         self.assertEqual(self.channel.state['last_attempt']['attempt_count'], 1)
         self.assertEqual(self.channel.writes[-1][2], 'Record verified Steam localization build')
@@ -235,6 +254,77 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(report['status'], 'publication_failed')
         self.assertEqual(report['failure_stage'], 'release_staging')
         self.assertEqual(self.channel.state, original)
+
+    def test_pending_recovery_refuses_changed_companion_with_unchanged_pak(self):
+        self.fail_partial_upload = True
+        self.assertEqual(self._run()[0], 2)
+        original = copy.deepcopy(self.channel.state['pending_release'])
+        changed = copy.deepcopy(self.companions)
+        changed['ASA_RU_Fix_P.ucas']['sha256'] = '9' * 64
+        code, report = self._run(run_id='recovery', companions=changed)
+        self.assertEqual(code, 2)
+        self.assertEqual(report['status'], 'publication_failed')
+        self.assertEqual(self.channel.state['pending_release'], original)
+        self.assertEqual(len(self.publications), 1)
+
+    def test_staging_rejects_unverified_companion_bytes(self):
+        (self.root / 'dist' / 'ASA_RU_Fix_P.ucas').write_bytes(b'UCAS')  # same size, different SHA
+        code, report = self._run()
+        self.assertEqual(code, 2)
+        self.assertEqual(report['failure_stage'], 'release_staging')
+        self.assertIn('ASA_RU_Fix_P.ucas differs', report['error'])
+        self.publisher.publish_release.assert_not_called()
+        self.publisher.write_channel.assert_not_called()
+
+    def test_legacy_pending_uses_original_single_pak_manifest_and_assets(self):
+        original = {'steam': {'manifest_id': '123', 'app_id': '2430930', 'depot_id': '2430931', 'checked_at': 'old'},
+                    'final_pak': {'path': updater.PAK_NAME, 'size': len(self.raw_pak), 'sha256': self.digest},
+                    'build_fingerprint': '7' * 64, 'git_commit': FIRST_COMMIT, 'run_id': 'old'}
+        self.channel.state['pending_release'] = {'version': '1.0.1', 'commit': FIRST_COMMIT, 'report': original}
+        code, report = self._run(run_id='recovery', commit=NEXT_COMMIT)
+        self.assertEqual(code, 0)
+        version, commit, assets = self.publications[0]
+        self.assertEqual((version, commit), ('1.0.1', FIRST_COMMIT))
+        self.assertEqual({name for name in assets if name.startswith('ASA_RU_Fix_P.')}, {updater.PAK_NAME})
+        self.assertNotIn('bundle', json.loads(assets['release-manifest.json']))
+        self.assertEqual(json.loads(assets['live-build-report.json']), original)
+        self.assertEqual(self.channel.stable['version'], '1.0.1')
+        self.assertNotIn('pending_release', self.channel.state)
+
+    def test_legacy_pending_cannot_take_reserved_first_bundle_version(self):
+        self.channel.stable['version'] = '1.0.1'
+        self.channel.stable['release']['tag'] = 'v1.0.1'
+        self.channel.stable['artifact']['download_url'] = self.channel.stable['artifact']['download_url'].replace('v1.0.0', 'v1.0.1')
+        pending = {'version': '1.0.2', 'commit': FIRST_COMMIT, 'report': {'build_fingerprint': FINGERPRINT}}
+        self.channel.state['pending_release'] = pending
+        code, report = self._run()
+        self.assertEqual(code, 2)
+        self.assertEqual(report['status'], 'publication_failed')
+        self.assertEqual(self.channel.state['pending_release'], pending)
+        self.publisher.publish_release.assert_not_called()
+
+    def test_offline_stage_cli_verifies_and_stages_without_network(self):
+        stable_json, report_json = self.root / 'stable.json', self.root / 'verified.json'
+        updater.write_json(stable_json, self.initial_stable)
+        updater.write_json(report_json, {
+            'git_commit': FIRST_COMMIT, 'steam': {'manifest_id': '123'},
+            'final_pak': {'size': len(self.raw_pak), 'sha256': self.digest}, 'companions': self.companions,
+            'tests': {'result': 'PASS'}, 'repak_validation': 'PASS',
+            'placeholder_printf_richtext_validation': {'status': 'PASS', 'issues': 0},
+            'translation_counts': {'shooter_desired': 1243, 'engine_desired': 21},
+        })
+        argv = ['auto_update', 'stage-bundle', '--repository', REPOSITORY,
+                '--stable-json', str(stable_json), '--report', str(report_json),
+                '--pak', str(self.root / 'dist' / updater.PAK_NAME)]
+        with patch.object(sys, 'argv', argv), patch.object(updater, 'ROOT', self.root), \
+             patch.object(updater, 'GitHubPublisher') as publisher, patch.object(updater, 'execute') as execute, \
+             patch.object(updater, 'probe_manifest') as probe, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(updater.main(), 0)
+        publisher.assert_not_called(); execute.assert_not_called(); probe.assert_not_called()
+        staged = self.root / 'work/release-staging/v1.0.2'
+        self.assertEqual({path.name for path in staged.iterdir()},
+                         {*updater.BUNDLE_NAMES, 'release-manifest.json', 'cloud-build-report.json', 'SHA256SUMS.txt'})
+        self.assertEqual(updater.read_json(staged / 'release-manifest.json')['bundle']['release']['commit'], FIRST_COMMIT)
 
 
 

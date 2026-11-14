@@ -14,11 +14,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tools.channel_state import (backoff, build_fingerprint, decide, next_version, record_failure,
-                                 record_success, record_transient_failure)
+from tools.channel_state import (BUNDLE_NAMES, PAK_NAME, artifact_identity, backoff, build_fingerprint,
+                                 bundle_identities, decide, next_version, record_failure, record_success,
+                                 record_transient_failure)
 from tools.bootstrap import TransientNetworkError, is_transient_network_error
 from tools.cloud_report import make_live_report, run_tests
-from tools.github_publish import GitHubPublisher, PAK_NAME
+from tools.github_publish import GitHubPublisher
 from tools.manifest_probe import probe_manifest
 from tools.server_depot import EXPECTED_PAK_SHA256, EXPECTED_PAK_SIZE, PINNED_MANIFEST, file_sha256
 
@@ -70,14 +71,62 @@ def validate_channel(stable: dict, state: dict, repository: str) -> None:
             or stable['build'].get('shooter_desired') != 1243
             or stable['build'].get('engine_desired') != 21):
         raise ValueError('invalid trusted stable channel metadata')
+    if 'bundle' in stable:
+        bundle = stable['bundle']
+        version = bundle['version']
+        next_version(version)
+        expected_artifacts = bundle_artifact_records(repository, version, channel_bundle_identities(bundle))
+        actual_artifacts = {asset['filename']: asset for asset in bundle['artifacts']}
+        bundle_release = bundle['release']
+        if (version_key(version) <= version_key(stable['version'])
+                or bundle_release['tag'] != 'v' + version
+                or not re.fullmatch(r'[0-9a-f]{40}', bundle_release['commit'])
+                or not bundle_release.get('published_at')
+                or any(actual_artifacts[asset['filename']]['download_url'] != asset['download_url']
+                       for asset in expected_artifacts)):
+            raise ValueError('invalid trusted stable bundle metadata')
+
+
+def version_key(version: str) -> tuple[int, ...]:
+    return tuple(map(int, version.split('.')))
+
+
+def next_bundle_version(stable: dict) -> str:
+    if 'bundle' in stable:
+        return next_version(stable['bundle']['version'])
+    return max('1.0.2', next_version(stable['version']), key=version_key)
+
+
+def channel_bundle_identities(bundle: dict) -> dict:
+    artifacts = bundle['artifacts']
+    if (not isinstance(artifacts, list) or len(artifacts) != len(BUNDLE_NAMES)
+            or any(not isinstance(asset, dict) or not isinstance(asset.get('filename'), str) for asset in artifacts)
+            or {asset['filename'] for asset in artifacts} != set(BUNDLE_NAMES)):
+        raise ValueError('invalid trusted stable bundle artifact set')
+    return {asset['filename']: artifact_identity(asset) for asset in artifacts}
+
+
+def bundle_artifact_records(repository: str, version: str, identities: dict) -> list[dict]:
+    prefix = f'https://github.com/{repository}/releases/download/v{version}/'
+    return [{'filename': name, **identities[name], 'download_url': prefix + name} for name in BUNDLE_NAMES]
+
+
+def legacy_release_fields(stable: dict) -> dict:
+    return {key: stable[key] for key in ('version', 'release', 'artifact')}
 
 
 def latest_release(stable: dict) -> dict:
+    if 'bundle' in stable:
+        bundle = stable['bundle']
+        identities = channel_bundle_identities(bundle)
+        return {'version': bundle['version'], 'tag': bundle['release']['tag'],
+                'sha256': identities[PAK_NAME]['sha256'], 'artifacts': identities}
     return {'version': stable['version'], 'tag': stable['release']['tag'],
             'sha256': stable['artifact']['sha256']}
 
 
-def update_stable(previous: dict, report: dict, published: dict | None) -> dict:
+def update_stable(previous: dict, report: dict, published: dict | None, *,
+                  repository: str | None = None) -> dict:
     stable = copy.deepcopy(previous)
     probe, source = report['steam'], report['source']
     stable['source'] = {
@@ -87,7 +136,12 @@ def update_stable(previous: dict, report: dict, published: dict | None) -> dict:
         'stock_locres': report['stock_locres'],
     }
     stable['build'] = {'fingerprint': report['build_fingerprint'], 'shooter_desired': 1243, 'engine_desired': 21}
-    if published:
+    if published and repository is not None:
+        stable['bundle'] = {'version': published['version'],
+                            'release': {k: published[k] for k in ('tag', 'published_at', 'commit')},
+                            'artifacts': bundle_artifact_records(repository, published['version'],
+                                                                 bundle_identities(report))}
+    elif published:
         stable['version'] = published['version']
         stable['release'] = {k: published[k] for k in ('tag', 'published_at', 'commit')}
         stable['artifact'] = {'filename': PAK_NAME, 'size': published['size'], 'sha256': published['sha256'],
@@ -96,27 +150,53 @@ def update_stable(previous: dict, report: dict, published: dict | None) -> dict:
 
 
 def stage_release(root: Path, repository: str, version: str, commit: str,
-                  report: dict, pak: Path, report_name: str) -> list[Path]:
+                  report: dict, pak: Path, report_name: str, *, legacy: dict | None = None) -> list[Path]:
     """Create only the small, verified public artifacts, never official stock data."""
     folder = root / 'work/release-staging' / ('v' + version)
     folder.mkdir(parents=True, exist_ok=True)
-    destination = folder / PAK_NAME
-    shutil.copyfile(pak, destination)
-    if file_sha256(destination) != report['final_pak']['sha256'] or destination.stat().st_size != report['final_pak']['size']:
-        raise ValueError('staged PAK differs from verified build report')
-    manifest = {'schema': 1, 'channel': 'stable', 'version': version,
-                'release': {'tag': 'v' + version, 'commit': commit},
+    identities = bundle_identities(report) if legacy is not None else {PAK_NAME: artifact_identity(report['final_pak'])}
+    files = []
+    for name, identity in identities.items():
+        destination = folder / name
+        shutil.copyfile(pak if name == PAK_NAME else pak.with_name(name), destination)
+        if destination.stat().st_size != identity['size'] or file_sha256(destination) != identity['sha256']:
+            raise ValueError(f'staged {name} differs from verified build report')
+        files.append(destination)
+    release = {'tag': 'v' + version, 'commit': commit}
+    manifest = {'schema': 1, 'channel': 'stable', 'version': version, 'release': release,
                 'source': report['steam'], 'build': {'fingerprint': report.get('build_fingerprint'),
                 'shooter_desired': 1243, 'engine_desired': 21},
-                'artifact': {'filename': PAK_NAME, 'size': destination.stat().st_size,
-                             'sha256': file_sha256(destination),
+                'artifact': {'filename': PAK_NAME, **identities[PAK_NAME],
                              'download_url': f'https://github.com/{repository}/releases/download/v{version}/{PAK_NAME}'}}
+    if legacy is not None:
+        manifest.update(legacy_release_fields(legacy),
+                        bundle={'version': version, 'release': release,
+                                'artifacts': bundle_artifact_records(repository, version, identities)})
     write_json(folder / 'release-manifest.json', manifest)
     write_json(folder / report_name, report)
-    files = [destination, folder / 'release-manifest.json', folder / report_name]
+    files.extend((folder / 'release-manifest.json', folder / report_name))
     sums = folder / 'SHA256SUMS.txt'
     sums.write_text(''.join(f'{file_sha256(path)}  {path.name}\n' for path in sorted(files)), encoding='utf-8')
     return files + [sums]
+
+
+def stage_local_bundle(root: Path, repository: str, stable: dict, report: dict, pak: Path) -> list[Path]:
+    """Prepare a candidate from a verified report and local files without using GitHub or Steam."""
+    validate_channel(stable, {'schema': 1}, repository)
+    commit = report.get('git_commit', '')
+    formatting = report.get('placeholder_printf_richtext_validation', {})
+    if (not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}', commit)
+            or report.get('tests', {}).get('result') != 'PASS'
+            or report.get('repak_validation') != 'PASS'
+            or formatting.get('status') != 'PASS' or formatting.get('issues') != 0
+            or report.get('translation_counts') != {'shooter_desired': 1243, 'engine_desired': 21}):
+        raise ValueError('offline staging requires a verified cloud or live build report')
+    identities = bundle_identities(report)
+    if 'bundle' in stable and identities == channel_bundle_identities(stable['bundle']):
+        raise ValueError('bundle identities match the current stable bundle')
+    report_name = 'live-build-report.json' if 'build_fingerprint' in report else 'cloud-build-report.json'
+    return stage_release(root, repository, next_bundle_version(stable), commit, report, pak, report_name,
+                         legacy=stable)
 
 
 def initialize(root: Path, repository: str, artifact_dir: Path, publisher: GitHubPublisher) -> dict:
@@ -159,7 +239,7 @@ def initialize(root: Path, repository: str, artifact_dir: Path, publisher: GitHu
 
 
 def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force: bool = False,
-               run_id: str = 'local') -> int:
+               run_id: str = 'local', expected_first_pak: str | None = None) -> int:
     work = root / 'work'
     work.mkdir(parents=True, exist_ok=True)
     (work / 'live-process.log').write_text('', encoding='utf-8')
@@ -173,6 +253,7 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
     probe, published = None, None
     pending = state.get('pending_release')
     recovering = pending is not None
+    bundle_mode = not recovering or pending.get('kind') == 'bundle'
     report['recovering_publication'] = recovering
     phase = 'recovery_prepare' if recovering else 'probe'
     try:
@@ -185,8 +266,14 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
         if recovering:
             # Complete the recorded transaction, not the latest Steam manifest.
             # Existing recovery revalidates these inputs and preserves asset bytes.
-            if (pending['report']['build_fingerprint'] != fingerprint
-                    or pending['version'] != next_version(stable['version'])):
+            # The migration can still finish v1.0.1 by reproducing its exact PAK
+            # below, even though the bundle build has a new fingerprint.
+            expected_version = next_bundle_version(stable) if bundle_mode else next_version(stable['version'])
+            if (pending['version'] != expected_version
+                    or (bundle_mode and (pending['report']['build_fingerprint'] != fingerprint
+                                         or pending['legacy'] != legacy_release_fields(stable)))
+                    or (not bundle_mode and ('bundle' in stable or pending.get('kind') is not None
+                                             or pending['version'] != '1.0.1'))):
                 raise ValueError('pending Release belongs to different build inputs; explicit review required')
             probe = copy.deepcopy(pending['report']['steam'])
             decision = {'action': 'build', 'reason': 'pending Release recovery takes priority'}
@@ -195,7 +282,9 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
             execute(root, sys.executable, '-m', 'tools.bootstrap', '--probe-only')
             probe = probe_manifest(work / 'tools/depotdownloader/DepotDownloader.exe', work / 'manifest-probe')
             print(f"Current Steam manifest: {probe['manifest_id']}; probe PAK downloaded bytes: 0", flush=True)
-            decision = decide(state, probe['manifest_id'], fingerprint, force, now=utc_now())
+            # A legacy single-PAK success does not establish the first bundle.
+            decision_state = state if 'bundle' in stable else {**state, 'last_successful': None}
+            decision = decide(decision_state, probe['manifest_id'], fingerprint, force, now=utc_now())
         report['steam'] = probe
         report['decision'] = decision
         if decision['action'] != 'build':
@@ -216,49 +305,57 @@ def run_update(root: Path, repository: str, publisher: GitHubPublisher, *, force
         execute(root, sys.executable, 'build.py', '--profile', 'live', '--source', 'steam', '--manifest', probe['manifest_id'])
         phase = 'validation'
         tests = run_tests(work / 'live-validation.log')
+        previous_bundle = channel_bundle_identities(stable['bundle']) if 'bundle' in stable else None
+        previous_sha = previous_bundle[PAK_NAME]['sha256'] if previous_bundle else stable['artifact']['sha256']
         report.update(make_live_report(read_json(work / 'build_validation.json'), tests, probe,
                       fingerprint=fingerprint, commit=commit, run_id=run_id,
-                      previous_sha=stable['artifact']['sha256']))
-        pending = state.get('pending_release')
-        if pending and (not report['pak_changed']
-                        or pending['report']['build_fingerprint'] != fingerprint
-                        or pending['report']['steam']['manifest_id'] != probe['manifest_id']
-                        or pending['report']['final_pak'] != report['final_pak']):
-            raise ValueError('unresolved Release transaction belongs to other inputs; explicit review required')
-        if report['pak_changed']:
-            version = next_version(stable['version'])
+                      previous_sha=previous_sha))
+        identities = bundle_identities(report) if bundle_mode else {PAK_NAME: artifact_identity(report['final_pak'])}
+        if bundle_mode:
+            if previous_bundle is None and expected_first_pak is not None and identities[PAK_NAME]['sha256'] != expected_first_pak:
+                raise ValueError('first bundle PAK differs from the candidate verified in the ARK client')
+            report['bundle_changed'] = identities != previous_bundle
+        changed = report['bundle_changed'] if bundle_mode else report['pak_changed']
+        if pending:
+            original = pending['report']
+            original_identities = (bundle_identities(original) if bundle_mode else
+                                   {PAK_NAME: artifact_identity(original['final_pak'])})
+            if (not changed or original['steam']['manifest_id'] != probe['manifest_id']
+                    or original_identities != identities):
+                raise ValueError('unresolved Release transaction belongs to other inputs; explicit review required')
+        if changed:
+            version = next_bundle_version(stable) if bundle_mode else next_version(stable['version'])
             report.update(release_created=True, release_tag='v' + version, version=version)
-            pending = state.get('pending_release')
             if pending:
-                original = pending['report']
-                if (pending['version'] != version
-                        or original['build_fingerprint'] != fingerprint
-                        or original['steam']['manifest_id'] != probe['manifest_id']
-                        or original['final_pak'] != report['final_pak']):
-                    raise ValueError('pending Release belongs to different inputs; explicit review required')
-                release_report, release_commit = original, pending['commit']
+                release_report, release_commit = pending['report'], pending['commit']
+                legacy = pending.get('legacy') if bundle_mode else None
             else:
                 release_report, release_commit = copy.deepcopy(report), commit
+                legacy = legacy_release_fields(stable)
+            phase = 'release_staging'
+            assets = stage_release(root, repository, version, release_commit, release_report,
+                                   root / 'dist' / PAK_NAME, 'live-build-report.json', legacy=legacy)
+            if not pending:
                 state = copy.deepcopy(state)
-                state['pending_release'] = {'version': version, 'commit': commit, 'report': release_report}
+                state['pending_release'] = {'kind': 'bundle', 'version': version, 'commit': commit,
+                                            'report': release_report, 'legacy': copy.deepcopy(legacy)}
                 phase = 'channel_prepare'
                 channel_head = publisher.write_channel(stable, state, channel_head,
                                                        'Prepare verified immutable Release transaction')
-            phase = 'release_staging'
-            assets = stage_release(root, repository, version, release_commit, release_report,
-                                   root / 'dist' / PAK_NAME, 'live-build-report.json')
             assets.sort(key=lambda path: path.name == PAK_NAME)
             phase = 'release_publish'
             published = publisher.publish_release(version, release_commit, assets,
                 notes=f"Автоматически проверенный русский перевод. Steam manifest: {probe['manifest_id']}. Все 1264 перевода, форматирование, упаковка и тесты проверены.")
         else:
-            print('Verified PAK SHA unchanged: no Release and no version increment.', flush=True)
-        updated = update_stable(stable, report, published)
+            print('Verified bundle identities unchanged: no Release and no version increment.', flush=True)
+        updated = update_stable(stable, report, published, repository=repository if bundle_mode else None)
         updated_state = record_success(state, probe['manifest_id'], fingerprint, run_id, latest_release(updated), utc_now())
         updated_state.pop('pending_release', None)
         phase = 'channel_commit'
         sha = publisher.write_channel(updated, updated_state, channel_head, 'Record verified Steam localization build')
         report.update(status='success', channel_commit=sha, stable_version=updated['version'])
+        if 'bundle' in updated:
+            report['bundle_version'] = updated['bundle']['version']
         write_json(work / 'live-build-report.json', report)
         return 0
     except Exception as exc:
@@ -316,18 +413,31 @@ def main() -> int:
     sub = parser.add_subparsers(dest='command', required=True)
     live = sub.add_parser('run')
     live.add_argument('--force-rebuild', action='store_true')
+    live.add_argument('--expected-first-pak', help='SHA-256 of the PAK verified in ARK before the first bundle release')
     init = sub.add_parser('initialize')
     init.add_argument('--artifact-dir', type=Path, required=True)
-    for command in (live, init):
+    stage = sub.add_parser('stage-bundle', help='stage a verified local bundle without network or publication')
+    stage.add_argument('--stable-json', type=Path, required=True)
+    stage.add_argument('--report', type=Path, required=True)
+    stage.add_argument('--pak', type=Path, required=True)
+    for command in (live, init, stage):
         command.add_argument('--repository', required=True)
     args = parser.parse_args()
+    if args.command == 'stage-bundle':
+        files = stage_local_bundle(ROOT, args.repository, read_json(args.stable_json), read_json(args.report), args.pak)
+        for path in files:
+            print(path)
+        return 0
+    expected_first_pak = getattr(args, 'expected_first_pak', None)
+    if expected_first_pak is not None and not re.fullmatch(r'[0-9a-f]{64}', expected_first_pak):
+        parser.error('--expected-first-pak must be a lowercase SHA-256')
     publisher = GitHubPublisher(args.repository)
     if args.command == 'initialize':
         result = initialize(ROOT, args.repository, args.artifact_dir, publisher)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     return run_update(ROOT, args.repository, publisher, force=args.force_rebuild,
-                      run_id=os.environ.get('GITHUB_RUN_ID', 'local'))
+                      run_id=os.environ.get('GITHUB_RUN_ID', 'local'), expected_first_pak=expected_first_pak)
 
 
 if __name__ == '__main__':
