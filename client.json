@@ -1,9 +1,9 @@
 {
   "artifact": {
-    "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/updater-v1.0.1/ASA-RU-Fix.exe",
+    "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/updater-v1.0.2/ASA-RU-Fix.exe",
     "filename": "ASA-RU-Fix.exe",
-    "sha256": "9dede06e1fc2dc4b5c64e8e20b8392c6e3b965f336560f3ac63f3cf0a1134bd8",
-    "size": 116278008
+    "sha256": "59dd92317a1c537eb1af4a439441bb2f9fca2a7d55c4ab8462c75cfe7628324a",
+    "size": 116294392
   },
   "build": {
     "debug_type": "embedded",
@@ -17,10 +17,10 @@
     "trimmed": false
   },
   "release": {
-    "commit": "1d7026997d1be8019143eaf879c2cd7d7f4dfae4",
-    "published_at": "2026-10-03T14:45:03Z",
-    "tag": "updater-v1.0.1"
+    "commit": "7b39f140c1d3d91d5cd9e6b94d4cd8d462369439",
+    "published_at": "2026-11-14T22:22:42Z",
+    "tag": "updater-v1.0.2"
   },
   "schema": 1,
-  "version": "1.0.1"
+  "version": "1.0.2"
 }
