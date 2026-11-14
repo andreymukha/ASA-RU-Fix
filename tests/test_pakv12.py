@@ -14,7 +14,8 @@ def string(value):
 
 
 def archive(version=12, encrypted_index=False, flags=0, method=0, missing=False,
-            bad_offset=False, corrupt=False, payload=b'test resource', block_size=2048, wide=False):
+            bad_offset=False, corrupt=False, payload=b'test resource', block_size=2048, wide=False,
+            counted_name=None, footer_extension=b"", path_hash_delta=0, directory_location=0, filename_length=None):
     block_count = (len(payload) + block_size - 1) // block_size if method else 0
     header_size = 53 + (4 + 16 * block_count if method else 0)
     sizes = [min(block_size, len(payload) - i * block_size) for i in range(block_count)]
@@ -36,16 +37,28 @@ def archive(version=12, encrypted_index=False, flags=0, method=0, missing=False,
         entry += struct.pack('<Q' if wide else '<I', len(payload))
         if block_count > 1:
             entry += struct.pack('<' + 'I' * block_count, *sizes)
-    directory = struct.pack('<i', 1) + string('folder/') + struct.pack('<i', 1) + string('other' if missing else 'file') + struct.pack('<I', 0)
-    directory_offset = len(header) + len(payload)
-    index = string('../../../') + struct.pack('<iQi', 1, 0, 0)
+    filename = string('other' if missing else 'file')
+    path_index = b''
+    if counted_name is not None:
+        filename = struct.pack('<i', len(counted_name) if filename_length is None else filename_length) + counted_name
+        path = 'folder/file'.encode('utf-16-le')
+        value = 0xcbf29ce484222325
+        for byte in path:
+            value = ((value ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+        path_index = struct.pack('<iQIi', 1, value, path_hash_delta, 0)
+    directory = struct.pack('<i', 1) + string('folder/') + struct.pack('<i', 1) + filename + struct.pack('<I', directory_location)
+    path_offset = len(header) + len(payload)
+    directory_offset = path_offset + len(path_index)
+    index = string('../../../') + struct.pack('<iQi', 1, 0, bool(path_index))
+    if path_index:
+        index += struct.pack('<QQ', path_offset, len(path_index)) + hashlib.sha1(path_index).digest()
     index += struct.pack('<iQQ', 1, directory_offset, len(directory)) + hashlib.sha1(directory).digest()
     index += struct.pack('<i', len(entry)) + entry + struct.pack('<i', 0)
     index_offset = directory_offset + len(directory)
     names = b'Oodle'.ljust(32, b'\0') + bytes(128)
     footer = bytes(16) + bytes([encrypted_index]) + struct.pack('<IIQQ', 0x5a6f12e1, version, index_offset, len(index))
     footer += hashlib.sha1(index).digest() + names
-    result = header + payload + directory + index + footer
+    result = header + payload + path_index + directory + index + footer + footer_extension
     if corrupt:
         result = result[:index_offset] + b'X' + result[index_offset + 1:]
     return result
@@ -60,6 +73,25 @@ class PakTests(unittest.TestCase):
 
     def test_plain(self):
         self.assertEqual(self.extract(archive()), b'test resource')
+
+    def test_counted_filename_with_corroborating_index(self):
+        for variant in (2, 4):
+            with self.subTest(variant=variant):
+                self.assertEqual(self.extract(archive(counted_name=b'file',
+                    footer_extension=struct.pack('<II', 98, variant))), b'test resource')
+
+    def test_counted_filename_rejects_legacy_footer_and_invalid_metadata(self):
+        footer = struct.pack('<II', 98, 2)
+        for options in ({'counted_name': b'file'},
+                        {'counted_name': b'file', 'footer_extension': struct.pack('<II', 98, 3)},
+                        {'counted_name': b'file', 'footer_extension': footer, 'path_hash_delta': 4},
+                        {'counted_name': b'file', 'footer_extension': footer, 'directory_location': 999},
+                        {'counted_name': b'fi\xffe', 'footer_extension': footer},
+                        {'counted_name': b'fi\0e', 'footer_extension': footer},
+                        {'counted_name': b'filx', 'footer_extension': footer},
+                        {'counted_name': b'file', 'footer_extension': footer, 'filename_length': 1000}):
+            with self.subTest(options=options), self.assertRaises(PakError):
+                self.extract(archive(**options))
 
     def test_oodle_block(self):
         self.assertEqual(self.extract(archive(method=1), lambda data, size: data), b'test resource')

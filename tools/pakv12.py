@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable
 
 LIMIT = 64 * 1024 * 1024
+UTF8_FILENAME_FOOTERS = frozenset(struct.pack('<II', 98, variant) for variant in (2, 4))
 MAGIC = struct.pack('<I', 0x5A6F12E1)
 
 
@@ -61,6 +62,22 @@ class Cursor:
         if '\0' in text:
             raise PakError('Embedded NUL in PAK FString')
         return text
+
+    def filename(self, *, allow_counted_utf8: bool) -> tuple[str, bool]:
+        length = self.number('i')
+        if allow_counted_utf8 and length > 0:
+            raw = self.take(length)
+            if not raw.endswith(b'\0'):
+                try:
+                    name = raw.decode('utf-8')
+                except UnicodeError as exc:
+                    raise PakError('Invalid counted PAK filename encoding') from exc
+                if '\0' in name or '/' in name or '\\' in name:
+                    raise PakError('Invalid counted PAK filename')
+                return name, True
+            self.position -= length
+        self.position -= 4
+        return self.string(), False
 
     def finish(self):
         if self.position != len(self.data):
@@ -125,8 +142,8 @@ class PakReader:
             except UnicodeError as exc:
                 raise PakError('Invalid compression method name') from exc
             self.methods.append(name)
-        # ASA appends two custom uint32 fields to the standard footer. Neither
-        # participates in extraction. Reject unrelated tail layouts.
+        # ASA can append two custom uint32 fields to the standard footer.
+        self.footer_extension = tail[cursor.position:]
         if len(tail) - cursor.position not in (0, 8):
             raise PakError('Unsupported V12 footer extension length')
 
@@ -135,10 +152,11 @@ class PakReader:
         self.mount = cursor.string()
         self.payload_boundary = self.index_offset
         count = cursor.count()
-        cursor.number('Q')  # path hash seed; exact lookup uses full directory
+        seed = cursor.number('Q')
+        path_hash_data = None
         if cursor.flag():
             offset, size, digest = cursor.number('Q'), cursor.number('Q'), cursor.take(20)
-            self._hashed(offset, size, digest)
+            path_hash_data = self._hashed(offset, size, digest)
             self.payload_boundary = min(self.payload_boundary, offset)
         if not cursor.flag():
             raise PakError('Full directory index is required')
@@ -150,11 +168,31 @@ class PakReader:
             raise PakError('Unencoded PAK entries are unsupported')
         cursor.finish()
         self.files = {}
+        hashes = None
+        allow_counted = self.footer_extension in UTF8_FILENAME_FOOTERS and path_hash_data is not None
         for _ in range(directory.count(8)):
             folder = directory.string()
             for _ in range(directory.count(8)):
-                filename = directory.string()
+                filename, counted = directory.filename(allow_counted_utf8=allow_counted)
                 location = directory.number('I')
+                if location > len(self.encoded) - 4:
+                    raise PakError('PAK directory entry offset outside compact entries')
+                if counted:
+                    # This V12 variant stores the exact UTF-8 byte count, with
+                    # no NUL. Require corroboration from the hashed path index;
+                    # a missing terminator in a legacy name is not sufficient.
+                    if hashes is None:
+                        paths = Cursor(path_hash_data)
+                        if paths.count(12) != count:
+                            raise PakError('PAK path-hash count disagrees with main index')
+                        hashes = {paths.number('Q'): paths.number('I') for _ in range(count)}
+                        if len(hashes) != count:
+                            raise PakError('Duplicate PAK path hash')
+                    path_hash = (0xcbf29ce484222325 + seed) & 0xffffffffffffffff
+                    for byte in (folder + filename).lstrip('/').lower().encode('utf-16-le'):
+                        path_hash = ((path_hash ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+                    if hashes.get(path_hash) != location:
+                        raise PakError('Counted PAK filename disagrees with path-hash index')
                 name = self.mount + folder + filename
                 if name in self.files:
                     raise PakError(f'Duplicate full directory filename: {name}')
