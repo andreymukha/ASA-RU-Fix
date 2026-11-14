@@ -54,7 +54,8 @@ internal static class AppRuntime
             pak_sha256 = hash,
             stable_manifest_reachable = stable is not null,
             stable_version = stable?.Version,
-            current_translation_version = stable is not null && stable.Artifact.Sha256 == hash ? stable.Version : null,
+            current_translation_version = stable is not null && steam?.GamePath is not null &&
+                PakUpdater.MatchesManifest(steam.GamePath, stable) ? stable.Version : null,
             network_error = error
         };
         // Only the explicitly requested diagnostic output is written; no Steam paths/identity are exported.
@@ -88,7 +89,9 @@ internal static class AppRuntime
             catch (Exception ex) { logger.Write("mutex-failed", ex.GetType().Name); }
             var result = await new LaunchCoordinator().RunAsync(arguments, original, async _ =>
             {
-                if (lease is null || !SteamDiscovery.IsGameDirectory(gamePath)) return;
+                if (!SteamDiscovery.IsGameDirectory(gamePath)) return;
+                if (lease is null)
+                    throw new PakRecoveryException("ASA RU Fix уже выполняет операцию. Дождитесь её завершения и повторите запуск.");
                 using var cancellation = new CancellationTokenSource();
                 using var progress = new LaunchProgress(cancellation);
                 try
@@ -98,6 +101,7 @@ internal static class AppRuntime
                         CheckedAt = DateTimeOffset.UtcNow.ToString("O") });
                     logger.Write("translation-" + pak.Status, pak.Version);
                 }
+                catch (PakRecoveryException ex) { logger.Write("translation-recovery-required", ex.Message); throw; }
                 catch (Exception ex) { logger.Write("translation-failed-open", ex.GetType().Name); throw; }
             }, CancellationToken.None, async () =>
             {

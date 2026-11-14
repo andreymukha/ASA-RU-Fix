@@ -25,6 +25,8 @@ public sealed class Uninstaller(ConfigStore store, IClientPlatform platform)
             changes.Add((profile, current, restored));
         }
         if (changes.Count == 0) throw new InvalidOperationException("Нет подтверждённых данных интеграции; updater не удалён.");
+        var transaction = new PakTransaction(Path.Combine(config.GamePath, "ShooterGame", "Content", "Paks"));
+        transaction.CheckRemoval(EnsureGameClosed);
         foreach (var change in changes)
         {
             if (LaunchOptionsManager.Read(change.Profile.LocalConfigPath) != change.Current)
@@ -35,9 +37,14 @@ public sealed class Uninstaller(ConfigStore store, IClientPlatform platform)
         foreach (var change in changes)
             if (LaunchOptionsManager.Read(change.Profile.LocalConfigPath)?.Contains("ASA-RU-Fix.exe", StringComparison.OrdinalIgnoreCase) == true)
                 throw new InvalidOperationException("Интеграция ещё активна. Updater сохранён.");
-        if (platform.IsGameRunning(config.GamePath)) throw new InvalidOperationException("Закройте ARK и повторите удаление.");
-        File.Delete(Path.Combine(config.GamePath, "ShooterGame/Content/Paks/ASA_RU_Fix_P.pak"));
+        transaction.Remove(EnsureGameClosed);
         platform.Unregister();
         // Running EXE and owned data are removed by a separate fixed-path helper AFTER exit.
+
+        void EnsureGameClosed()
+        {
+            if (platform.IsGameRunning(config.GamePath))
+                throw new InvalidOperationException("Закройте ARK и повторите удаление.");
+        }
     }
 }

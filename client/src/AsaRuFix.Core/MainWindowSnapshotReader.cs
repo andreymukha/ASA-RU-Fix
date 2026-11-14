@@ -40,10 +40,9 @@ public static class MainWindowSnapshotReader
         if (stateValid && steam?.GamePath is not null)
             try
             {
-                string pak = Path.Combine(steam.GamePath, "ShooterGame/Content/Paks/ASA_RU_Fix_P.pak");
-                pakVerified = File.Exists(pak) && AtomicFile.Sha256(pak).Equals(state.TranslationSha256, StringComparison.OrdinalIgnoreCase);
+                pakVerified = PakUpdater.MatchesInstalled(steam.GamePath, state.TranslationSha256!);
             }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or JsonException) { }
         return new()
         {
             SteamFound = steam is not null, ArkFound = steam?.GamePath is not null && SteamDiscovery.IsGameDirectory(steam.GamePath),

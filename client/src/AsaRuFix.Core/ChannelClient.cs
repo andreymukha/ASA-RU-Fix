@@ -9,17 +9,27 @@ namespace AsaRuFix.Core;
 
 public sealed record Artifact(string Filename, long Size, string Sha256, string DownloadUrl)
 {
+    internal const string PakFilename = "ASA_RU_Fix_P.pak";
+    internal const string UtocFilename = "ASA_RU_Fix_P.utoc";
+    internal const string UcasFilename = "ASA_RU_Fix_P.ucas";
+    internal const string ClientFilename = "ASA-RU-Fix.exe";
+
     internal void Validate(string? expectedVersion = null)
     {
-        var client = Filename == "ASA-RU-Fix.exe";
-        if (!client && Filename != "ASA_RU_Fix_P.pak") throw new InvalidDataException("Неизвестное имя файла обновления.");
-        if (Size <= 0 || Size > (client ? 512L : 128L) * 1024 * 1024) throw new InvalidDataException("Недопустимый размер обновления.");
+        var maxMegabytes = Filename switch
+        {
+            ClientFilename => 512L,
+            PakFilename or UcasFilename => 128L,
+            UtocFilename => 8L,
+            _ => throw new InvalidDataException("Неизвестное имя файла обновления.")
+        };
+        if (Size <= 0 || Size > maxMegabytes * 1024 * 1024) throw new InvalidDataException("Недопустимый размер обновления.");
         if (Sha256 is null || !Regex.IsMatch(Sha256, "\\A[0-9a-fA-F]{64}\\z", RegexOptions.CultureInvariant))
             throw new InvalidDataException("Некорректный SHA-256.");
         const string prefix = "https://github.com/andreymukha/ASA-RU-Fix/releases/download/";
         if (DownloadUrl is null || !DownloadUrl.StartsWith(prefix, StringComparison.Ordinal)) throw new InvalidDataException("Недопустимый URL обновления.");
         var parts = DownloadUrl[prefix.Length..].Split('/');
-        var tagPrefix = client ? "updater-v" : "v";
+        var tagPrefix = Filename == ClientFilename ? "updater-v" : "v";
         if (parts.Length != 2 || parts[1] != Filename || !parts[0].StartsWith(tagPrefix, StringComparison.Ordinal))
             throw new InvalidDataException("URL не соответствует файлу release.");
         var version = parts[0][tagPrefix.Length..];
@@ -30,6 +40,8 @@ public sealed record Artifact(string Filename, long Size, string Sha256, string 
 
 public sealed record ChannelManifest(int Schema, string Version, Artifact Artifact)
 {
+    public IReadOnlyList<Artifact> Companions { get; private init; } = Array.Empty<Artifact>();
+
     public static ChannelManifest ParseStable(string json) => Parse(json, false);
     public static ChannelManifest ParseClient(string json) => Parse(json, true);
     private static ChannelManifest Parse(string json, bool client)
@@ -44,22 +56,56 @@ public sealed record ChannelManifest(int Schema, string Version, Artifact Artifa
             if ((!client || root.TryGetProperty("channel", out _)) && root.GetProperty("channel").GetString() != "stable")
                 throw new InvalidDataException("Неизвестный канал обновлений.");
             var version = root.GetProperty("version").GetString() ?? throw new InvalidDataException("Отсутствует версия.");
-            var numericVersion = version;
-            SemVersion.Parse(numericVersion);
+            var legacyVersion = SemVersion.Parse(version);
             if (root.TryGetProperty("release", out var release) && release.TryGetProperty("tag", out var tag) &&
-                tag.GetString() != (client ? "updater-v" : "v") + numericVersion)
+                tag.GetString() != (client ? "updater-v" : "v") + version)
                 throw new InvalidDataException("Release tag не соответствует версии.");
-            var data = root.GetProperty("artifact");
-            var artifact = new Artifact(data.GetProperty("filename").GetString()!, data.GetProperty("size").GetInt64(),
-                data.GetProperty("sha256").GetString()!, data.GetProperty("download_url").GetString()!);
-            if (artifact.Filename != (client ? "ASA-RU-Fix.exe" : "ASA_RU_Fix_P.pak"))
+            var artifact = ReadArtifact(root.GetProperty("artifact"), version);
+            if (artifact.Filename != (client ? Artifact.ClientFilename : Artifact.PakFilename))
                 throw new InvalidDataException("Неверное имя файла для канала.");
-            artifact.Validate(numericVersion);
-            return new(schema, version, artifact with { Sha256 = artifact.Sha256.ToLowerInvariant() });
+            if (!client && root.TryGetProperty("bundle", out var bundle))
+                return ParseBundle(bundle, schema, legacyVersion);
+            return new(schema, version, artifact);
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
         { throw new InvalidDataException("Некорректный manifest обновления.", exception); }
     }
+
+    private static ChannelManifest ParseBundle(JsonElement bundle, int schema, SemVersion legacyVersion)
+    {
+        var version = bundle.GetProperty("version").GetString() ?? throw new InvalidDataException("Отсутствует версия комплекта перевода.");
+        if (SemVersion.Parse(version).CompareTo(legacyVersion) <= 0)
+            throw new InvalidDataException("Версия комплекта перевода должна быть новее версии отдельного PAK.");
+        if (bundle.GetProperty("release").GetProperty("tag").GetString() != "v" + version)
+            throw new InvalidDataException("Release tag не соответствует версии комплекта перевода.");
+
+        var files = bundle.GetProperty("artifacts");
+        if (files.GetArrayLength() != 3) throw new InvalidDataException("Комплект перевода должен содержать PAK, UTOC и UCAS.");
+        var artifacts = new Dictionary<string, Artifact>(StringComparer.Ordinal);
+        foreach (var file in files.EnumerateArray())
+        {
+            var artifact = ReadArtifact(file, version);
+            if (!artifacts.TryAdd(artifact.Filename, artifact))
+                throw new InvalidDataException("Комплект перевода содержит повторяющиеся файлы.");
+        }
+        if (!artifacts.TryGetValue(Artifact.PakFilename, out var pak) ||
+            !artifacts.TryGetValue(Artifact.UtocFilename, out var utoc) ||
+            !artifacts.TryGetValue(Artifact.UcasFilename, out var ucas))
+            throw new InvalidDataException("Комплект перевода должен содержать PAK, UTOC и UCAS.");
+        return new(schema, version, pak)
+        {
+            Companions = Array.AsReadOnly(new[] { utoc, ucas })
+        };
+    }
+
+    private static Artifact ReadArtifact(JsonElement data, string version)
+    {
+        var artifact = new Artifact(data.GetProperty("filename").GetString()!, data.GetProperty("size").GetInt64(),
+            data.GetProperty("sha256").GetString()!, data.GetProperty("download_url").GetString()!);
+        artifact.Validate(version);
+        return artifact with { Sha256 = artifact.Sha256.ToLowerInvariant() };
+    }
+
     private static void RejectDuplicateKeys(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)

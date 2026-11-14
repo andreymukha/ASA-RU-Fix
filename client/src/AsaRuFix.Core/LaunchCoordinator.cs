@@ -9,7 +9,7 @@ public sealed class LaunchCoordinator
     {
         var command = GameCommandBuilder.Build(gameArgs, original);
         try { await update(cancellationToken).ConfigureAwait(false); }
-        catch (Exception) { /* Translation failures must never prevent the original game command. */ }
+        catch (Exception error) when (error is not PakRecoveryException) { /* Continue with the previous installation. */ }
         using var process = Process.Start(new ProcessStartInfo(command.FileName, command.Arguments) { UseShellExecute = false })
             ?? throw new IOException("Не удалось запустить исходную команду игры.");
         var backgroundTask = RunBackground();

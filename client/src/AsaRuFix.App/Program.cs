@@ -42,8 +42,8 @@ internal static class Program
         }
         catch (Exception error)
         {
-            // Headless Steam mode must not leave a modal dialog in front of the game.
-            if (!args.Contains("--steam-launch")) MessageBox.Show(error.Message, "ASA-RU-Fix — ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (!args.Contains("--steam-launch") || error is PakRecoveryException)
+                MessageBox.Show(error.Message, "ASA-RU-Fix — ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
     }

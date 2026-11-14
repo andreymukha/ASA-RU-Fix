@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AsaRuFix.Core;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -13,9 +14,104 @@ public sealed class ChannelTests
     [TestMethod]
     public void StableAndClientManifestValidateIndependentVersions()
     {
-        Assert.AreEqual("1.2.3", ChannelManifest.ParseStable(DownloadFixture.Manifest(false, "1.2.3")).Version);
-        Assert.AreEqual("1.2.3", ChannelManifest.ParseClient(DownloadFixture.Manifest(true, "1.2.3")).Version);
+        var stable = ChannelManifest.ParseStable(DownloadFixture.Manifest(false, "1.2.3"));
+        var client = ChannelManifest.ParseClient(DownloadFixture.Manifest(true, "1.2.3"));
+        Assert.AreEqual("1.2.3", stable.Version);
+        Assert.AreEqual("1.2.3", client.Version);
+        Assert.IsEmpty(stable.Companions);
+        Assert.IsEmpty(client.Companions);
     }
+
+    [TestMethod]
+    public void StableBundleSelectsNewerVersionAndPak()
+    {
+        var manifest = ChannelManifest.ParseStable(StableBundle().ToJsonString());
+        Assert.AreEqual("1.3.0", manifest.Version);
+        Assert.AreEqual("ASA_RU_Fix_P.pak", manifest.Artifact.Filename);
+        Assert.AreEqual(BundleUrl("1.3.0", "ASA_RU_Fix_P.pak"), manifest.Artifact.DownloadUrl);
+        CollectionAssert.AreEqual(new[] { "ASA_RU_Fix_P.utoc", "ASA_RU_Fix_P.ucas" }, manifest.Companions.Select(file => file.Filename).ToArray());
+        foreach (var companion in manifest.Companions)
+        {
+            Assert.AreEqual(DownloadFixture.Hash, companion.Sha256);
+            Assert.AreEqual(BundleUrl("1.3.0", companion.Filename), companion.DownloadUrl);
+        }
+    }
+
+    [TestMethod]
+    [DataRow("null")]
+    [DataRow("same version")]
+    [DataRow("older version")]
+    [DataRow("missing tag")]
+    [DataRow("wrong tag")]
+    [DataRow("missing file")]
+    [DataRow("duplicate file")]
+    [DataRow("foreign file")]
+    [DataRow("extra file")]
+    [DataRow("wrong URL version")]
+    [DataRow("wrong repository")]
+    [DataRow("beyond utoc limit")]
+    [DataRow("beyond ucas limit")]
+    [DataRow("bad hash")]
+    [DataRow("invalid legacy")]
+    public void InvalidBundleIsRejectedRatherThanFallingBack(string defect)
+    {
+        var root = StableBundle(defect == "same version" ? "1.2.3" : defect == "older version" ? "1.2.2" : "1.3.0");
+        var bundle = root["bundle"]!.AsObject();
+        var files = bundle["artifacts"]!.AsArray();
+        switch (defect)
+        {
+            case "null": root["bundle"] = null; break;
+            case "missing tag": bundle["release"]!.AsObject().Remove("tag"); break;
+            case "wrong tag": bundle["release"]!["tag"] = "updater-v1.3.0"; break;
+            case "missing file": files.RemoveAt(0); break;
+            case "duplicate file": files[0] = files[2]!.DeepClone(); break;
+            case "foreign file": files[0]!["filename"] = "Other.ucas"; break;
+            case "extra file": files.Add(files[0]!.DeepClone()); break;
+            case "wrong URL version": files[0]!["download_url"] = BundleUrl("1.2.3", "ASA_RU_Fix_P.ucas"); break;
+            case "wrong repository": files[0]!["download_url"] = BundleUrl("1.3.0", "ASA_RU_Fix_P.ucas").Replace("andreymukha", "foreign"); break;
+            case "beyond utoc limit": files[2]!["size"] = 8 * 1024 * 1024 + 1; break;
+            case "beyond ucas limit": files[0]!["size"] = 128 * 1024 * 1024 + 1; break;
+            case "bad hash": files[0]!["sha256"] = "wrong"; break;
+            case "invalid legacy": root["artifact"]!["size"] = 0; break;
+        }
+        Assert.Throws<InvalidDataException>(() => ChannelManifest.ParseStable(root.ToJsonString()));
+    }
+
+    [TestMethod]
+    [DataRow("utoc")]
+    [DataRow("ucas")]
+    public async Task DownloadsValidateCompanionFilesOnSameRepositoryRelease(string extension)
+    {
+        using var fixture = new DownloadFixture();
+        var filename = $"ASA_RU_Fix_P.{extension}";
+        var target = Path.Combine(fixture.Root, filename);
+        var artifact = new Artifact(filename, DownloadFixture.Bytes.Length, DownloadFixture.Hash, BundleUrl("1.3.0", filename));
+        await Assert.ThrowsAsync<InvalidDataException>(() => fixture.Client.DownloadAsync(artifact with
+        { DownloadUrl = BundleUrl("1.3.0", filename).Replace("/v1.3.0/", "/updater-v1.3.0/") }, target, null, default));
+        Assert.AreEqual(0, fixture.Requests.Count);
+        await fixture.Client.DownloadAsync(artifact, target, null, default);
+        CollectionAssert.AreEqual(DownloadFixture.Bytes, File.ReadAllBytes(target));
+        Assert.AreEqual(artifact.DownloadUrl, fixture.Requests.Single().Uri.AbsoluteUri);
+    }
+
+    private static JsonObject StableBundle(string version = "1.3.0")
+    {
+        var root = JsonNode.Parse(DownloadFixture.Manifest(false, "1.2.3"))!.AsObject();
+        root["bundle"] = JsonSerializer.SerializeToNode(new
+        {
+            version,
+            release = new { tag = "v" + version },
+            artifacts = new[] { "ucas", "pak", "utoc" }.Select(extension =>
+            {
+                var filename = $"ASA_RU_Fix_P.{extension}";
+                return new { filename, size = DownloadFixture.Bytes.Length, sha256 = DownloadFixture.Hash.ToUpperInvariant(), download_url = BundleUrl(version, filename) };
+            })
+        });
+        return root;
+    }
+
+    private static string BundleUrl(string version, string filename) =>
+        $"https://github.com/andreymukha/ASA-RU-Fix/releases/download/v{version}/{filename}";
 
     [TestMethod]
     [DataRow("schema", "2")]
