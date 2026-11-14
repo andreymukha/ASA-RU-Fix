@@ -94,6 +94,15 @@ class BuildAssetsTests(unittest.TestCase):
                 with self.subTest(version=version), self.assertRaises(ValueError):
                     validate_project_version(props, version)
 
+    def test_version_overrides_cannot_drift_from_updater_manifest(self):
+        with tempfile.TemporaryDirectory() as folder:
+            props = Path(folder) / 'Directory.Build.props'
+            for field in ('AssemblyVersion', 'FileVersion'):
+                with self.subTest(field=field), self.assertRaisesRegex(ValueError, field):
+                    props.write_text('<Project><PropertyGroup><Version>1.0.3</Version>'
+                                     f'<{field}>1.0.1.0</{field}></PropertyGroup></Project>')
+                    validate_project_version(props, '1.0.3')
+
     def test_report_is_deterministic_and_user_folder_contains_only_exe(self):
         with tempfile.TemporaryDirectory() as folder:
             publish = Path(folder) / 'publish'

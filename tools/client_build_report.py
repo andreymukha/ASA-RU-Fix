@@ -24,7 +24,11 @@ def validate_version(version: str) -> str:
 
 
 def validate_project_version(project: Path, version: str | None = None) -> str:
-    versions = [entry.text for entry in ET.parse(project).getroot().iter('Version')]
+    props = ET.parse(project).getroot()
+    for field in ('AssemblyVersion', 'FileVersion'):
+        if next(props.iter(field), None) is not None:
+            raise ValueError(f'Directory.Build.props must derive {field} from Version')
+    versions = [entry.text for entry in props.iter('Version')]
     if len(versions) != 1 or not versions[0]:
         raise ValueError('Directory.Build.props must define exactly one literal Version')
     actual = validate_version(versions[0])

@@ -4,7 +4,7 @@
 
 ## Для игроков
 
-1. Скачать [ASA-RU-Fix.exe](https://github.com/andreymukha/ASA-RU-Fix/releases/download/updater-v1.0.2/ASA-RU-Fix.exe).
+1. Скачать [ASA-RU-Fix.exe](https://github.com/andreymukha/ASA-RU-Fix/releases/download/updater-v1.0.3/ASA-RU-Fix.exe).
 2. Запустить.
 3. Нажать «Установить и настроить».
 4. Дальше запускать ARK через Steam как обычно.

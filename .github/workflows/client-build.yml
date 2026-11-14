@@ -54,6 +54,18 @@ jobs:
       - name: Publish the single unsigned user EXE
         run: dotnet publish src/AsaRuFix.App/AsaRuFix.App.csproj --configuration Release --runtime win-x64 --self-contained true --output ../work/client-publish -p:PublishSingleFile=true -p:PublishTrimmed=false -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:RuntimeFrameworkVersion=10.0.12 -p:ContinuousIntegrationBuild=true -p:SourceRevisionId=$env:GITHUB_SHA
 
+      - name: Verify published executable and managed assembly versions
+        run: |
+          $project = [xml](Get-Content -Raw Directory.Build.props)
+          $version = [string]$project.Project.PropertyGroup.Version
+          $expected = [version]("$version.0")
+          $exe = (Get-Item ../work/client-publish/ASA-RU-Fix.exe).VersionInfo
+          $assembly = [Reflection.AssemblyName]::GetAssemblyName((Resolve-Path src/AsaRuFix.App/bin/Release/net10.0-windows/win-x64/ASA-RU-Fix.dll).Path)
+          $fileVersion = [version]::new($exe.FileMajorPart, $exe.FileMinorPart, $exe.FileBuildPart, $exe.FilePrivatePart)
+          if ($fileVersion -ne $expected -or $assembly.Version -ne $expected) {
+            throw "Expected $expected, published file version=$fileVersion and managed assembly version=$($assembly.Version)."
+          }
+
       - name: Validate one-file output and record size and SHA-256
         working-directory: .
         run: python -m tools.client_build_report --project client/Directory.Build.props --publish-dir work/client-publish --output-dir work/client-metadata --commit $env:GITHUB_SHA --repository $env:GITHUB_REPOSITORY
