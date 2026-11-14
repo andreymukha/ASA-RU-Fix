@@ -7,8 +7,36 @@
   },
   "build": {
     "engine_desired": 21,
-    "fingerprint": "0657946702a3b4a33dca7b1328e198b9c3af49a30c88b1df710adc0ee7b2ab36",
+    "fingerprint": "02c6cc72819f1ffa9673b630817944ef3ded9ff7a2bfb1ee9e68601929e7b386",
     "shooter_desired": 1243
+  },
+  "bundle": {
+    "artifacts": [
+      {
+        "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/v1.0.2/ASA_RU_Fix_P.pak",
+        "filename": "ASA_RU_Fix_P.pak",
+        "sha256": "97849b22c2baf0c83eb6c861eeebd1fba858d044cb96c5950c8440ff9ce53b1d",
+        "size": 13634441
+      },
+      {
+        "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/v1.0.2/ASA_RU_Fix_P.utoc",
+        "filename": "ASA_RU_Fix_P.utoc",
+        "sha256": "4cf47c360360ed970df26b1db1c83072f3035a33f4b98e6cbb6d3d09d195c353",
+        "size": 202
+      },
+      {
+        "download_url": "https://github.com/andreymukha/ASA-RU-Fix/releases/download/v1.0.2/ASA_RU_Fix_P.ucas",
+        "filename": "ASA_RU_Fix_P.ucas",
+        "sha256": "81cf60aca4403cb235e1f34e43c2cb7b4a0d8f3540d2c27b43d30f7286c43425",
+        "size": 64
+      }
+    ],
+    "release": {
+      "commit": "7b39f140c1d3d91d5cd9e6b94d4cd8d462369439",
+      "published_at": "2026-11-14T22:24:35Z",
+      "tag": "v1.0.2"
+    },
+    "version": "1.0.2"
   },
   "channel": "stable",
   "release": {
@@ -18,7 +46,7 @@
   },
   "schema": 1,
   "source": {
-    "checked_at": "2026-11-14T14:37:31Z",
+    "checked_at": "2026-11-14T22:23:15Z",
     "depot_id": "2430931",
     "manifest_id": "1699900905164446885",
     "server_pak_sha256": "68eb76d78cb7c2e124bf12d50a07396f4b5e5b2db6bfb781475ffb74dd1c7878",
