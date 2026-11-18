@@ -34,5 +34,15 @@
     "tag": "v1.0.2",
     "version": "1.0.2"
   },
-  "schema": 1
+  "schema": 1,
+  "transient_failure": {
+    "at": "2026-11-18T18:22:58.045117Z",
+    "build_fingerprint": "02c6cc72819f1ffa9673b630817944ef3ded9ff7a2bfb1ee9e68601929e7b386",
+    "failure_count": 1,
+    "manifest_id": "6268348989345964786",
+    "next_retry_at": "2026-11-18T18:52:58.045117Z",
+    "reason": "BOOTSTRAP TRANSIENT NETWORK ERROR: <urlopen error [WinError 10060] A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond>\n",
+    "run_id": "44368922022",
+    "status": "backoff"
+  }
 }
