@@ -34,5 +34,15 @@
     "tag": "v1.0.2",
     "version": "1.0.2"
   },
-  "schema": 1
+  "schema": 1,
+  "transient_failure": {
+    "at": "2026-11-26T23:23:52.645691Z",
+    "build_fingerprint": "02c6cc72819f1ffa9673b630817944ef3ded9ff7a2bfb1ee9e68601929e7b386",
+    "failure_count": 1,
+    "manifest_id": null,
+    "next_retry_at": "2026-11-26T23:53:52.645691Z",
+    "reason": "BOOTSTRAP TRANSIENT NETWORK ERROR: The read operation timed out\n",
+    "run_id": "45910510316",
+    "status": "backoff"
+  }
 }
