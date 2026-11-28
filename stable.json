@@ -7,7 +7,7 @@
   },
   "build": {
     "engine_desired": 21,
-    "fingerprint": "414c6abe0bdb60cb2c0391f7c08dc476b8ee34d7daf627212dc62880fce8d11d",
+    "fingerprint": "bc59ff75da4e34f873bef727ece7a59a8173e048d3116804f2c6150c6868336c",
     "shooter_desired": 1243
   },
   "bundle": {
@@ -46,7 +46,7 @@
   },
   "schema": 1,
   "source": {
-    "checked_at": "2026-11-28T10:27:23Z",
+    "checked_at": "2026-11-28T10:33:08Z",
     "depot_id": "2430931",
     "manifest_id": "909047212639962653",
     "server_pak_sha256": "16f6a3b2252a1be379f153822b3205d33e7587946dcb9dbaae53e11d6d2a4380",

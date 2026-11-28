@@ -1,18 +1,18 @@
 {
   "last_attempt": {
-    "at": "2026-11-28T10:28:43.844070Z",
+    "at": "2026-11-28T10:34:13.740333Z",
     "attempt_count": 1,
-    "build_fingerprint": "414c6abe0bdb60cb2c0391f7c08dc476b8ee34d7daf627212dc62880fce8d11d",
+    "build_fingerprint": "bc59ff75da4e34f873bef727ece7a59a8173e048d3116804f2c6150c6868336c",
     "failure_count": 0,
     "manifest_id": "909047212639962653",
-    "run_id": "46135231067",
+    "run_id": "46135661342",
     "status": "success"
   },
   "last_successful": {
-    "at": "2026-11-28T10:28:43.844070Z",
-    "build_fingerprint": "414c6abe0bdb60cb2c0391f7c08dc476b8ee34d7daf627212dc62880fce8d11d",
+    "at": "2026-11-28T10:34:13.740333Z",
+    "build_fingerprint": "bc59ff75da4e34f873bef727ece7a59a8173e048d3116804f2c6150c6868336c",
     "manifest_id": "909047212639962653",
-    "run_id": "46135231067"
+    "run_id": "46135661342"
   },
   "latest_release": {
     "artifacts": {
