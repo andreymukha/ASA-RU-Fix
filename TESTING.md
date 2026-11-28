@@ -26,7 +26,7 @@
 
 Локальные проверки перед hosted запуском:
 
-- Python: 228/228 PASS, включая regression на counted UTF-8 filename при footer `(98, 23)`, прежние проверки повреждённых индексов и транзакций публикации, офлайн-доступность и SHA-256 текста лицензии ooz.
+- Python: 230/230 PASS, включая regression на counted UTF-8 filename при footer `(98, 23)`, прежние проверки повреждённых индексов и транзакций публикации, офлайн-доступность и SHA-256 текста лицензии ooz, отделение mock-диагностики от настоящих Actions annotations.
 - .NET: 175/175 PASS с документированным `ChildProbe` harness; updater/установка не изменены, release EXE не собирался.
 - Реальные server PAK manifest `1699900905164446885` и `909047212639962653`: V12, 2445/2445 path-hash совпадений в каждом; четыре LOCRES извлечены и повторно разобраны. EN LOCRES побайтно совпадают, новые source identity не принимались.
 - Оба production build: 1243/1243 ShooterGame + 21/21 Engine MATCH после repak info/list/unpack и повторного чтения LOCRES; placeholders/printf/RichText — 0 ошибок.
@@ -34,6 +34,8 @@
 - Новый результат: PAK 13 648 986 bytes, SHA-256 `3776b000cd0a90e5290031c4252a03b52ecd3e06707b9a347eed61786941ad66`. UTOC (202 bytes) и UCAS (64 bytes) побайтно прежние; механизм монтирования не менялся.
 - Диагностика, исходные и повторные проверки, логи тестов и сборок сохранены локально в ignored `work/automation-recovery-20261128/`. Результаты hosted запуска проверяются отдельно после push; локальный PASS сам по себе не означает публикацию.
 - Первая hosted попытка [46134906848](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/46134906848) остановилась на отдельном transient timeout при скачивании GPL с gnu.org, до чтения PAK. Текст лицензии теперь хранится побайтно в репозитории и копируется с проверкой прежнего pinned SHA-256; новая сетезависимость не добавлялась, лицензия не менялась. Ошибка не расходовала deterministic failures и не создала Release.
+- Полная hosted сборка [46135231067](https://github.com/andreymukha/ASA-RU-Fix/actions/runs/46135231067): SUCCESS за 1m49s, 1 156 621 568 downloaded bytes, 228/228 tests PASS, новый fingerprint, 1264 переводов PASS. Штатно опубликован immutable [v1.0.3](https://github.com/andreymukha/ASA-RU-Fix/releases/tag/v1.0.3); три скачанных файла побайтно совпали с локальным production build. `client.json` побайтно прежний, updater 1.0.3. Фактический stable/client manifest успешно разобран текущим .NET Core-кодом клиента, SHA-256 всех трёх скачанных assets проверены.
+- При full suite моковые BLOCKED/BACKOFF/error messages сохраняются без изменений в test log, но workflow-команды экранируются в console output, чтобы fixtures не создавали ложных предупреждений/ошибок рабочего job. Результаты failed tests не меняются.
 - Источник 15-минутных dispatch установлен по журналу VPS. Дублирующий GitHub cron заменён ежедневным резервом; изменение root-owned VPS-таймера остаётся административным действием, описанным в [cloud-build.md](docs/cloud-build.md#автоматическое-обновление-и-публикация).
 
 ## Серверная автоматизация — 2026-10-03

@@ -8,6 +8,7 @@ import json
 import platform
 import subprocess
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,10 +26,13 @@ def run_tests(log_path: Path) -> dict[str, object]:
 
     buffer = io.StringIO()
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py")
-    result = unittest.TextTestRunner(stream=buffer, verbosity=2).run(suite)
+    with redirect_stdout(buffer), redirect_stderr(buffer):
+        result = unittest.TextTestRunner(stream=buffer, verbosity=2).run(suite)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(buffer.getvalue(), encoding="utf-8")
-    sys.stdout.write(buffer.getvalue())
+    # Mocked update failures emit workflow commands. Preserve the exact log,
+    # but do not turn fixture diagnostics into real job warnings/errors.
+    sys.stdout.write(buffer.getvalue().replace('::', ': :'))
     return {
         "result": "PASS" if result.wasSuccessful() else "FAIL",
         "count": result.testsRun,
