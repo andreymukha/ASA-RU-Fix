@@ -2,7 +2,9 @@ name: Automatic stable localization update
 
 on:
   schedule:
-    - cron: "17,47 * * * *"
+    # VPS asa-ru-fix-trigger.timer provides frequent workflow_dispatch probes.
+    # Keep one daily independent fallback rather than duplicate every probe.
+    - cron: "47 3 * * *"
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -47,6 +49,11 @@ jobs:
           if ($env:FORCE_REBUILD -eq 'true') { $updateArgs += '--force-rebuild' }
           python @updateArgs
           exit $LASTEXITCODE
+
+      - name: Summarize actual build status
+        if: always()
+        shell: pwsh
+        run: python -m tools.automation_summary
 
       - name: Preserve diagnostic reports
         if: always()

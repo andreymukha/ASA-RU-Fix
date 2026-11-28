@@ -15,7 +15,8 @@ def string(value):
 
 def archive(version=12, encrypted_index=False, flags=0, method=0, missing=False,
             bad_offset=False, corrupt=False, payload=b'test resource', block_size=2048, wide=False,
-            counted_name=None, footer_extension=b"", path_hash_delta=0, directory_location=0, filename_length=None):
+            counted_name=None, footer_extension=b"", path_hash_delta=0, directory_location=0, filename_length=None,
+            include_path_hash=True):
     block_count = (len(payload) + block_size - 1) // block_size if method else 0
     header_size = 53 + (4 + 16 * block_count if method else 0)
     sizes = [min(block_size, len(payload) - i * block_size) for i in range(block_count)]
@@ -45,7 +46,8 @@ def archive(version=12, encrypted_index=False, flags=0, method=0, missing=False,
         value = 0xcbf29ce484222325
         for byte in path:
             value = ((value ^ byte) * 0x100000001b3) & 0xffffffffffffffff
-        path_index = struct.pack('<iQIi', 1, value, path_hash_delta, 0)
+        if include_path_hash:
+            path_index = struct.pack('<iQIi', 1, value, path_hash_delta, 0)
     directory = struct.pack('<i', 1) + string('folder/') + struct.pack('<i', 1) + filename + struct.pack('<I', directory_location)
     path_offset = len(header) + len(payload)
     directory_offset = path_offset + len(path_index)
@@ -80,10 +82,18 @@ class PakTests(unittest.TestCase):
                 self.assertEqual(self.extract(archive(counted_name=b'file',
                     footer_extension=struct.pack('<II', 98, variant))), b'test resource')
 
+    def test_counted_filename_after_asa_build_number_changes(self):
+        # Manifest 909047212639962653 has (98, 23), the same directory layout
+        # and path hashing as manifest 1699900905164446885 with (98, 2).
+        for build in ((98, 23), (99, 0)):
+            with self.subTest(build=build):
+                self.assertEqual(self.extract(archive(counted_name=b'file',
+                    footer_extension=struct.pack('<II', *build))), b'test resource')
+
     def test_counted_filename_rejects_legacy_footer_and_invalid_metadata(self):
         footer = struct.pack('<II', 98, 2)
         for options in ({'counted_name': b'file'},
-                        {'counted_name': b'file', 'footer_extension': struct.pack('<II', 98, 3)},
+                        {'counted_name': b'file', 'footer_extension': footer, 'include_path_hash': False},
                         {'counted_name': b'file', 'footer_extension': footer, 'path_hash_delta': 4},
                         {'counted_name': b'file', 'footer_extension': footer, 'directory_location': 999},
                         {'counted_name': b'fi\xffe', 'footer_extension': footer},

@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Callable
 
 LIMIT = 64 * 1024 * 1024
-UTF8_FILENAME_FOOTERS = frozenset(struct.pack('<II', 98, variant) for variant in (2, 4))
 MAGIC = struct.pack('<I', 0x5A6F12E1)
 
 
@@ -169,7 +168,10 @@ class PakReader:
         cursor.finish()
         self.files = {}
         hashes = None
-        allow_counted = self.footer_extension in UTF8_FILENAME_FOOTERS and path_hash_data is not None
+        # The custom footer fields change between ASA builds, even with the
+        # same directory layout. Determine compatibility from the checked
+        # indexes and corroborate each counted name below, not build numbers.
+        allow_counted = len(self.footer_extension) == 8 and path_hash_data is not None
         for _ in range(directory.count(8)):
             folder = directory.string()
             for _ in range(directory.count(8)):
