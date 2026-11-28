@@ -148,13 +148,21 @@ def compiler_setup() -> Path:
     raise RuntimeError('Building ooz requires Visual Studio 2022 Build Tools: Desktop development with C++ (MSVC x64 and Windows SDK). Install it, then rerun bootstrap.')
 
 
+def prepare_ooz_license(folder: Path):
+    # Keep the exact, pinned license available even when gnu.org is unreachable.
+    license_path = ROOT / 'tools/licenses/GPL-3.0.txt'
+    if sha256(license_path) != GPL_HASH:
+        raise RuntimeError('Bundled ooz GPL-3.0.txt SHA-256 mismatch')
+    write_changed(folder / 'GPL-3.0.txt', license_path.read_bytes())
+
+
 def prepare_ooz():
     folder = TOOLS / 'ooz'
     source = folder / 'source'
     source.mkdir(parents=True, exist_ok=True)
     for name, digest in OOZ_FILES.items():
         ensure_download(f'https://raw.githubusercontent.com/powzix/ooz/{OOZ_COMMIT}/{name}', source / name, digest)
-    ensure_download('https://www.gnu.org/licenses/gpl-3.0.txt', folder / 'GPL-3.0.txt', GPL_HASH)
+    prepare_ooz_license(folder)
     upstream = (source / 'kraken.cpp').read_text(encoding='utf-8')
     if 'either version 3 of the License, or' not in upstream or '(at your option) any later version.' not in upstream:
         raise RuntimeError('Pinned ooz license declaration was not found')

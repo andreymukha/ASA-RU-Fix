@@ -23,7 +23,7 @@ BUILD_INPUTS = (
     'tools/auto_update.py', 'tools/bootstrap.py', 'tools/channel_state.py',
     'tools/cloud_report.py', 'tools/corrections.py', 'tools/github_publish.py', 'tools/iostore_companions.py',
     'tools/locres.py', 'tools/manifest_probe.py', 'tools/oodle.py',
-    'tools/ooz_bridge.cpp', 'tools/pak_order.py', 'tools/pakv12.py', 'tools/server_depot.py',
+    'tools/ooz_bridge.cpp', 'tools/licenses/GPL-3.0.txt', 'tools/pak_order.py', 'tools/pakv12.py', 'tools/server_depot.py',
     'tools/steam.py', 'tools/translation_data.py',
     'data/shootergame_ru.json', 'data/engine_ru.json', 'data/source_identity.json',
 )

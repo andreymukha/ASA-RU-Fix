@@ -11,10 +11,31 @@ from tools.bootstrap import (
     DEPOTDOWNLOADER_VERSION,
     ensure_download,
     is_transient_network_error,
+    prepare_ooz_license,
+    GPL_HASH,
 )
 
 
 class CacheTests(unittest.TestCase):
+    def test_ooz_license_is_available_without_network(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder)
+            with patch('urllib.request.urlopen', side_effect=AssertionError('network used')):
+                prepare_ooz_license(target)
+            self.assertEqual(hashlib.sha256((target / 'GPL-3.0.txt').read_bytes()).hexdigest(), GPL_HASH)
+
+    def test_corrupt_bundled_license_is_rejected_without_replacing_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / 'tools/licenses/GPL-3.0.txt'
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b'wrong')
+            target = root / 'GPL-3.0.txt'
+            target.write_bytes(b'previous')
+            with patch('tools.bootstrap.ROOT', root), self.assertRaisesRegex(RuntimeError, 'SHA-256 mismatch'):
+                prepare_ooz_license(root)
+            self.assertEqual(target.read_bytes(), b'previous')
+
     def test_verified_cache_never_downloads(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'cached'
